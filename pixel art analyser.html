@@ -1,0 +1,406 @@
+<input id="input_image" accept="image/*" type="file" />
+<!-- <input id="doit" type="button" value="Count" /> -->
+
+<div id="output">
+	<canvas id="image"></canvas>
+</div>
+<div id="palette">
+	<div id="swatches"></div>
+	<span>
+		Sort by:
+		<input type="button" value="Position" id="sort_pos" />
+		<input type="button" value="Use" id="sort_use" />
+		<input type="button" value="Brightness" id="sort_bright" />
+		<input type="button" value="RGBA" id="sort_col" />
+		<input type="button" value="HSL" id="sort_hsl" />
+	</span>
+	<span># colours: <span id="palette_count">?</span></span><span id="report"></span>
+</div>
+
+<style>
+	span {display: inline-block;}
+
+	canvas {display: block;}
+
+	#palette {}
+
+	#swatches {padding:5px; line-height: 0; background:#ccc;}
+	.swatch {border:0 solid; width: 20px; height: 20px;}
+	.swatch:hover {border-width: 1px; width: 18px; height: 18px;}
+
+	#output {position: relative;}
+		#image {image-rendering: pixelated;}
+		#overlay {position: absolute; top: 0; left: 0;}
+			#overlay.on {display: block;}
+			#overlay.off {display: none;}
+</style>
+
+<script type="text/javascript">
+	var input = document.querySelector("#input_image");
+	var output = document.querySelector("#output");
+	var image = document.querySelector("#image");
+	var palette = document.querySelector("#palette");
+	var palette_count = document.querySelector("#palette_count");
+	var report = document.querySelector("#report");
+	input.onchange = function() {
+		if (input.files.length > 0) {
+			var fr = new FileReader();
+			fr.onload = function() {
+				var img = new Image();
+				img.onload = function() {
+					setTimeout(function() {
+						count(img);
+					}, 0);
+				};
+				//       prompt("",fr.result);
+				img.src = fr.result;
+			};
+			fr.readAsDataURL(input.files[0]);
+		}
+	};
+
+	function indexToXY(index, width) {
+		var y = (index / width) | 0,
+			x = index - (y * width);
+		return [x, y];
+	}
+
+	function count(img) { // count
+		swatches.innerHTML = "";
+
+		var canvas = image;
+		canvas.width = img.width;
+		canvas.height = img.height;
+
+		var ctx = canvas.getContext("2d");
+		ctx.drawImage(img, 0, 0);
+
+		var unique_colours = {
+			all: []
+		};
+
+		var image_data = ctx.getImageData(0, 0, canvas.width, canvas.height);
+		var colours = image_data.data;
+
+		for (var i = 0, l = colours.length; i < l; i += 4) {
+
+			var unq = "#" +
+				pad(colours[i].toString(16), 2) +
+				pad(colours[i + 1].toString(16), 2) +
+				pad(colours[i + 2].toString(16), 2) +
+				" A:" + pad(colours[i + 3].toString(16), 2);
+
+
+			if (unq in unique_colours) {
+				unique_colours[unq].points.push(indexToXY(i / 4, img.width));
+			} else {
+				var u;
+				
+				var hsl = rgbToHsl(colours[i], colours[i + 1], colours[i + 2]);
+				var althsl = [(hsl[0]+0.5)%1, (hsl[1]+0.5)%1, (hsl[2]+0.5)%1];
+				
+				unique_colours.all.push(unique_colours[unq] = u = {
+					rgba: "rgba(" + colours[i] + "," + colours[i + 1] + "," + colours[i + 2] + "," + colours[i + 3] + ")",
+					colour: [colours[i], colours[i + 1], colours[i + 2], colours[i + 3]],
+					hsl: hsl, contrasting: `hsl(${althsl[0]*360},${althsl[1]*100}%,${althsl[2]*100}%)`,
+					sort_by: {
+						hex: unq,
+						rgba: unq
+					},
+					points: [indexToXY(i / 4, img.width)]
+				});
+				// console.log(u.hsl);
+			}
+		}
+
+		function pad(v, pad) {
+			v = "" + v;
+			while (v.length < pad) {
+				v = "0" + v;
+			}
+			return v;
+		}
+
+		var unqs = Object.keys(unique_colours).filter(function(v) {
+			return v !== "all";
+		});
+
+		unqs = unqs.map(function(v) {
+			return unique_colours[v];
+		});
+
+		// console.log(unqs);
+
+
+		// store position ordering
+		unqs.forEach(function(v, i) {
+			v.sort_by.position = i;
+		});
+		
+		// find usage ordering
+		unqs.sort(function(a, b) {
+			return b.points.length - a.points.length;
+		});
+		unqs.forEach(function(v, i) {
+			v.sort_by.use = i;
+		});
+
+		// find rgba sorting
+		unqs.sort(function(a, b) {
+			return (
+				a.sort_by.rgba < b.sort_by.rgba ? -1 :
+				a.sort_by.rgba == b.sort_by.rgba ? 0 :
+				/* a.sort > b.sort */
+				1
+			);
+		});
+		unqs.forEach(function(v, i) {
+			v.sort_by.rgba = i;
+		});
+
+		// find brightness sorting
+		unqs.forEach(function(v, i) {
+			v.brightness = (v.colour[0] + v.colour[1] + v.colour[2]) / 3;
+		});
+		unqs.sort(function(a,b){
+			return b.brightness - a.brightness;
+		});
+		unqs.forEach(function(v,i){v.sort_by.brightness = i;});
+
+		// find hsl sorting
+		unqs.sort(function(a, b) {
+			return (
+				a.hsl[0] > b.hsl[0] ? 1 :
+				a.hsl[0] < b.hsl[0] ? -1 :
+					// H = H
+					a.hsl[1] > b.hsl[1] ? 1 :
+					a.hsl[1] < b.hsl[1] ? -1 :
+						// S = S
+						a.hsl[2] > b.hsl[2] ? 1 :
+						a.hsl[2] < b.hsl[2] ? -1 :
+							// HSL = HSL
+							0
+			);
+		});
+		unqs.forEach(function(v, i) {
+			v.sort_by.hsl = i;
+		});
+
+		function sorter(type) {
+			return function() {
+				unqs.sort(function(a, b) {
+					return a.sort_by[type] - b.sort_by[type];
+				});
+				unqs.forEach(function(v) {
+					swatches.appendChild(v.swatch);
+				});
+			}
+		}
+
+		sort_pos.onclick = sorter("position");
+		sort_use.onclick = sorter("use");
+		sort_bright.onclick = sorter("brightness");
+		sort_col.onclick = sorter("rgba");
+		sort_hsl.onclick = sorter("hsl");
+
+		for (var i = 0, l = unqs.length; i < l; i++) {
+			var unq = unqs[i];
+			if (typeof unq != "number") {
+
+				// make overlay
+				var instructions = [];
+				for (var p = 0, ps = unq.points.length; p < ps; p++) {
+					var point = unq.points[p];
+					instructions.push(`ctx.rect(${point[0]},${point[1]},1,1);`);
+				}
+				//   console.log(instructions);
+
+				// make swatch
+				var swatch = document.createElement("span");
+				swatch.className = "swatch";
+				swatch.title = unq.rgba + " x " + unq.points.length + "pixels";
+				swatch.style.backgroundColor = unq.rgba;
+				swatch.style.borderColor = unq.contrasting;
+				swatch.unq = unq;
+				(function(instructions) {
+					swatch.onmouseover = function() {
+						var unq = this.unq;
+						
+						console.log(this.unq);
+						overlay.className = "on";
+						var ctx = overlay.ctx;
+						ctx.clearRect(0,0, canvas.width,canvas.height);
+						ctx.save();
+						
+						
+						flicker.light = this.unq.brightness < 255/2;
+						
+						flicker.colour = unq.contrasting;
+						// console.log(`hsl(${unq.hsl[0]*360},${unq.hsl[1]*100}%,${unq.hsl[2]*100}%) vs ${flicker.colour}`);
+						// console.log(unq.hsl);
+						
+						// ctx.clearRect(0, 0, overlay.width, overlay.height);
+						ctx.beginPath();
+						instructions(ctx);
+						ctx.clip();
+						// ctx.fillRect(0, 0, overlay.width, overlay.height);
+					};
+					swatch.onmouseout = function() {
+						overlay.className = "off";
+						overlay.ctx.restore();
+					};
+				})(
+					new Function("ctx", instructions.join(""))
+				);
+				swatches.appendChild(swatch);
+				unq.swatch = swatch;
+			}
+		}
+		sort_hsl.onclick();
+
+		console.log(unique_colours);
+
+		palette_count.innerText = unique_colours.all.length;
+
+		overlay.width = img.width; overlay.height = img.height;
+
+	};
+
+	var flicker = (function() {
+		var size = 5, cross = Math.sqrt(size * 2 * size);
+		
+		var canvas = document.createElement("CANVAS");
+		canvas.width = size;
+		canvas.height = size;
+		canvas.size = size;
+		var ctx = canvas.ctx = canvas.getContext("2d");
+		
+		canvas.style.background="red";
+		
+		canvas.colour = "white";
+		canvas.light = true;
+		
+		var a = 1;
+		
+		// colours
+		var light = "rgba(255,255,255, "+a+")";
+		var dark = "rgba(0,0,0, "+a+")";
+		
+		var loop = 1000;
+		var bar = size / 4;
+		requestAnimationFrame(function frame(time) {
+		// setTimeout(function() {
+			var root = ((time % loop) / loop);
+			// var root = 0;
+			
+			ctx.save();
+			ctx.clearRect(0,0, size,size);
+			ctx.rotate(-45 * Math.PI / 180);
+			
+			ctx.beginPath();
+			ctx.rect(-cross/2, (root-1) * cross,  cross, bar);
+			ctx.rect(-cross/2, (root-0.5) * cross,  cross, bar);
+			ctx.rect(-cross/2, (root) * cross,  cross, bar);
+			ctx.rect(-cross/2, (root + 0.5) * cross,  cross, bar);
+			// ctx.fillStyle = canvas.light ? light : dark;
+			ctx.fillStyle = canvas.colour;
+			ctx.fill();
+			
+			ctx.restore();
+			
+			overlay.ctx.fillStyle = overlay.ctx.createPattern(canvas, "repeat");
+			//demo.ctx.fillStyle = overlay.ctx.createPattern(canvas, "repeat");
+			
+			// document.body.style.background="url('"+canvas.toDataURL()+"')";
+			
+			requestAnimationFrame(frame);
+		}, 0);
+		
+		/*
+		var demo = (function() {
+			var canvas = document.createElement("CANVAS");
+			canvas.style.background="red";
+			document.body.appendChild(canvas);
+			// canvas.width = 300
+			var ctx = canvas.ctx = canvas.getContext("2d");
+			
+			
+			
+			requestAnimationFrame(function frame(time) {
+				ctx.clearRect(0,0, canvas.width,canvas.height); 
+				ctx.fillRect(0,0, canvas.width,canvas.height); 
+				
+				// ctx.save();
+				// 
+				// var offset = ((time % loop) / loop) * flicker.size;
+				// ctx.translate(offset, offset);
+				// 
+				// ctx.fillRect(-offset,-offset, canvas.width,canvas.height); 
+				
+				
+				
+				// ctx.restore();
+				
+				requestAnimationFrame(frame);
+			});
+			
+			return canvas;
+		})();
+		//*/
+		
+		document.body.appendChild(canvas);
+		
+		return canvas;
+	})();
+
+	var overlay = (function() {
+		var canvas = document.createElement("CANVAS");
+		var ctx = canvas.ctx = canvas.getContext("2d");
+
+		canvas.id = "overlay";
+		canvas.className = "off";
+		output.appendChild(canvas);
+
+		requestAnimationFrame(function frame() {
+			ctx.clearRect(0,0, canvas.width,canvas.height);
+			ctx.fillRect(0,0, canvas.width, canvas.height);
+			
+			requestAnimationFrame(frame);
+		});
+
+		return canvas;
+	})();
+
+
+		// https://gist.github.com/mjackson/5311256
+		function rgbToHsl(r, g, b) {
+			r /= 255, g /= 255, b /= 255;
+
+			var max = Math.max(r, g, b),
+				min = Math.min(r, g, b);
+			var h, s, l = (max + min) / 2;
+
+			if (max == min) {
+				h = s = 0; // achromatic
+			} else {
+				var d = max - min;
+				s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+
+				switch (max) {
+					case r:
+						h = (g - b) / d + (g < b ? 6 : 0);
+						break;
+					case g:
+						h = (b - r) / d + 2;
+						break;
+					case b:
+						h = (r - g) / d + 4;
+						break;
+				}
+
+				h /= 6;
+			}
+
+			return [h, s, l];
+		}
+</script>
