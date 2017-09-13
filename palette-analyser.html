@@ -1,13 +1,14 @@
+<h1>Palette Analyser</h1>
 <input id="input_image" accept="image/*" type="file" />
-<!-- <input id="doit" type="button" value="Count" /> -->
-
+<span>Image (click "choose file" to load):</span>
 <div id="output">
-	<canvas id="image"></canvas>
+	<canvas id="image" width=0 height=0></canvas>
 </div>
 <div id="palette">
 	<div id="swatches"></div>
+	<span>Once loaded, hover over the colours above to see rgba value, how many pixels use the colour, and see those pixels highlighted.</span>
 	<span>
-		Sort by:
+		Sort palette by:
 		<input type="button" value="Position" id="sort_pos" />
 		<input type="button" value="Use" id="sort_use" />
 		<input type="button" value="Brightness" id="sort_bright" />
@@ -24,7 +25,7 @@
 
 	#palette {}
 
-	#swatches {padding:5px; line-height: 0; background:#ccc;}
+	#swatches {padding:5px; line-height: 0; background:#ccc; margin-bottom:5px;}
 	.swatch {border:0 solid; width: 20px; height: 20px;}
 	.swatch:hover {border-width: 1px; width: 18px; height: 18px;}
 
@@ -287,7 +288,7 @@
 		var dark = "rgba(0,0,0, "+a+")";
 		
 		var loop = 1000;
-		var bar = size / 4;
+		var bar = size / 3;
 		requestAnimationFrame(function frame(time) {
 		// setTimeout(function() {
 			var root = ((time % loop) / loop);
@@ -348,7 +349,7 @@
 		})();
 		//*/
 		
-		document.body.appendChild(canvas);
+		// document.body.appendChild(canvas);
 		
 		return canvas;
 	})();
