@@ -1,12 +1,19 @@
+<!doctype html>
+<meta charset="utf-8" />
 <title>Palette Analyser</title>
 <h1>Palette Analyser</h1>
-<input id="input_image" accept="image/*" type="file" />
-<span>Image (click "choose file" to load):</span>
+<div>
+	<span>Image (click "choose file" to load):</span><input id="input_image" accept="image/*" type="file" /><input type="button" id="load" value="Load" />
+</div>
+
 <div id="output">
 	<canvas id="image" width=0 height=0></canvas>
 </div>
 <div id="palette">
-	<div id="swatches"></div>
+	<div id="swatches">
+	
+	
+	</div>
 	<span>Once loaded, hover over the colours above to see rgba value, how many pixels use the colour, and see those pixels highlighted. Drag the colours around to reorder them, or click the buttons.</span>
 	<span>
 		Sort palette by:
@@ -24,25 +31,46 @@
 
 	canvas {display: block;}
 
-	#palette {}
-
-	#swatches {
-		padding:5px; line-height: 0; min-height:20px; margin:5px 0;
-		background:#ccc; background:linear-gradient(0deg, #ccc, #eee);
-	}
-	.swatch {border:0 solid; width: 20px; height: 20px;}
-	.swatch:hover {border-width: 1px; width: 18px; height: 18px; background-position:-1px, -1px;}
-	.swatch.addLeft {border-left: 5px solid #ccc !important;}
-	
-	#output {position: relative;}
+	#output {position: relative; float:left;}
 		#image {image-rendering: pixelated; box-shadow:0 0 5px rgba(0,0,0,0.3);}
 		#overlay {position: absolute; top: 0; left: 0;}
 			#overlay.on {display: block;}
 			#overlay.off {display: none;}
+
+
+
+	#palette {float:left;}
+
+	#swatches {
+		
+		padding:5px; line-height: 0; min-height:20px; margin:5px 0;
+		background:#ccc; background:linear-gradient(0deg, #ccc, #eee);
+	}
+	.swatch {border:0 solid; width: 20px; height: 20px; position: relative;}
+	.swatch:hover {border-width: 1px; width: 18px; height: 18px; background-position:-1px, -1px;}
+	.swatch:hover .combine {display:block;}
+	
+	.swatch.addLeft {border-left: 5px solid #ccc !important;}
+	
+	.combine {
+		display:none; position:absolute; top:3px; z-index:2;
+		width:10px; height:10px; background:black; border-radius:50%;
+		color:white; line-height:10px; font-size:10px;
+		cursor:pointer;
+	}
+		.combine.left {left:-5px;}
+			.combine.left::before {content:"⮲";}
+		.combine.right {right:-5px;}
+			.combine.right::before {content:"⮳";}
+	
+	.swatch:first-of-type .combine.left {display:none;}
+	.swatch:last-of-type .combine.right {display:none;}
+	
 </style>
 
 <script type="text/javascript">
 	var input = document.querySelector("#input_image");
+	var load = document.querySelector("#load");
 	var output = document.querySelector("#output");
 	var image = document.querySelector("#image");
 	var palette = document.querySelector("#palette");
@@ -64,6 +92,9 @@
 			fr.readAsDataURL(input.files[0]);
 		}
 	};
+	load.onclick = function() {
+		input.onchange();
+	};
 
 	function indexToXY(index, width) {
 		var y = (index / width) | 0,
@@ -71,6 +102,7 @@
 		return [x, y];
 	}
 
+	var swatch_count = 0;
 	function count(img) { // count
 		swatches.innerHTML = "";
 
@@ -78,7 +110,7 @@
 		canvas.width = img.width;
 		canvas.height = img.height;
 
-		var ctx = canvas.getContext("2d");
+		var ctx = image.ctx = canvas.getContext("2d");
 		ctx.drawImage(img, 0, 0);
 
 		var unique_colours = {
@@ -228,38 +260,77 @@
 					url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABQAAAAUCAYAAACNiR0NAAAASElEQVQ4T2NsaGj4z4AG6uvr0YUYGhsbMcSwqWMcNRAcThSF4X8gQA9tYiMAmzrGUQPBwUlRGI4mbMoTNtXDcDRhU56wqR2GAFADmuNMnSdvAAAAAElFTkSuQmCC)
 					`;
 				swatch.style.borderColor = unq.contrasting;
+				
+				var left = document.createElement("SPAN");
+				left.className = "combine left";
+				left.title = "Overwrite swatch to the left";
+				swatch.appendChild(left);
+				left.onclick = function(e) { var a = e.target.parentNode; combine(a, a.previousSibling); }
+				
+				var right = document.createElement("SPAN");
+				right.className = "combine right";
+				right.title = "Overwrite swatch to the right";
+				swatch.appendChild(right);
+				right.onclick = function(e) { var a = e.target.parentNode; combine(a, a.nextSibling); }
+				
+				// var picker = document.createElement("INPUT");
+				// picker.type = "color";
+				
+				function combine(a, b) {
+					console.log("combine", a.unq.rgba, b.unq.rgba);
+					
+					b.parentNode.removeChild(b);
+					
+					unqs.splice(unqs.indexOf(b.unq),1);
+					a.unq.points.push.apply(a.unq.points, b.unq.points);
+					
+					var ctx = image.ctx;
+					ctx.save();
+					
+					ctx.beginPath(); b.plot(ctx); ctx.clip();
+					ctx.fillStyle=a.unq.rgba;
+					ctx.clearRect(0,0, image.width,image.height);
+					ctx.fillRect(0,0, image.width,image.height);
+					
+					ctx.restore();
+					
+					// count
+					// move points/plot
+					var a1 = a.plot, b1 = b.plot;
+					a.plot = function(ctx) { a1(ctx); b1(ctx); };
+					swatch_count--; update_count();
+				}
+				
 				swatch.unq = unq;
 				
-				(function(instructions) {
-					swatch.onmouseover = function() {
-						var unq = this.unq;
-						
-						// console.log(this.unq);
-						overlay.className = "on";
-						var ctx = overlay.ctx;
-						ctx.clearRect(0,0, canvas.width,canvas.height);
-						ctx.save();
-						
-						
-						flicker.light = this.unq.brightness < 255/2;
-						
-						flicker.colour = unq.contrasting;
-						// console.log(`hsl(${unq.hsl[0]*360},${unq.hsl[1]*100}%,${unq.hsl[2]*100}%) vs ${flicker.colour}`);
-						// console.log(unq.hsl);
-						
-						// ctx.clearRect(0, 0, overlay.width, overlay.height);
-						ctx.beginPath();
-						instructions(ctx);
-						ctx.clip();
-						// ctx.fillRect(0, 0, overlay.width, overlay.height);
-					};
-					swatch.onmouseout = function() {
-						overlay.className = "off";
-						overlay.ctx.restore();
-					};
-				})(
-					new Function("ctx", instructions.join(""))
-				);
+				swatch.plot = new Function("ctx", instructions.join(""));
+				swatch.onmouseover = function() {
+					var unq = this.unq;
+					
+					// console.log(this.unq);
+					overlay.className = "on";
+					var ctx = overlay.ctx;
+					ctx.clearRect(0,0, canvas.width,canvas.height);
+					ctx.save();
+					
+					
+					flicker.light = this.unq.brightness < 255/2;
+					
+					flicker.colour = unq.contrasting;
+					// console.log(`hsl(${unq.hsl[0]*360},${unq.hsl[1]*100}%,${unq.hsl[2]*100}%) vs ${flicker.colour}`);
+					// console.log(unq.hsl);
+					
+					// ctx.clearRect(0, 0, overlay.width, overlay.height);
+					ctx.beginPath();
+					this.plot(ctx);
+					ctx.clip();
+					// ctx.fillRect(0, 0, overlay.width, overlay.height);
+				};
+				swatch.onmouseout = function() {
+					overlay.className = "off";
+					overlay.ctx.restore();
+				};
+					
 				
 				swatch.draggable = true;
 				
@@ -314,11 +385,16 @@
 
 		console.log(unique_colours);
 
-		palette_count.innerText = unique_colours.all.length;
+		swatch_count = unique_colours.all.length;
+		update_count();
 
 		overlay.width = img.width; overlay.height = img.height;
 
 	};
+
+	function update_count() {
+		palette_count.innerText = swatch_count;
+	}
 
 	var flicker = (function() {
 		var size = 5, cross = Math.sqrt(size * 2 * size);
