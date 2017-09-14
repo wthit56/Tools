@@ -27,7 +27,7 @@
 	#palette {}
 
 	#swatches {
-		padding:5px; line-height: 0; margin-bottom:5px;
+		padding:5px; line-height: 0; min-height:20px; margin:5px 0;
 		background:#ccc; background:linear-gradient(0deg, #ccc, #eee);
 	}
 	.swatch {border:0 solid; width: 20px; height: 20px;}
@@ -35,7 +35,7 @@
 	.swatch.addLeft {border-left: 5px solid #ccc !important;}
 	
 	#output {position: relative;}
-		#image {image-rendering: pixelated;}
+		#image {image-rendering: pixelated; box-shadow:0 0 5px rgba(0,0,0,0.3);}
 		#overlay {position: absolute; top: 0; left: 0;}
 			#overlay.on {display: block;}
 			#overlay.off {display: none;}
