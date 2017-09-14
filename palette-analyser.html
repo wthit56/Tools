@@ -7,7 +7,7 @@
 </div>
 <div id="palette">
 	<div id="swatches"></div>
-	<span>Once loaded, hover over the colours above to see rgba value, how many pixels use the colour, and see those pixels highlighted.</span>
+	<span>Once loaded, hover over the colours above to see rgba value, how many pixels use the colour, and see those pixels highlighted. Drag the colours around to reorder them, or click the buttons.</span>
 	<span>
 		Sort palette by:
 		<input type="button" value="Position" id="sort_pos" />
@@ -26,10 +26,14 @@
 
 	#palette {}
 
-	#swatches {padding:5px; line-height: 0; background:#ccc; margin-bottom:5px;}
+	#swatches {
+		padding:5px; line-height: 0; margin-bottom:5px;
+		background:#ccc; background:linear-gradient(0deg, #ccc, #eee);
+	}
 	.swatch {border:0 solid; width: 20px; height: 20px;}
-	.swatch:hover {border-width: 1px; width: 18px; height: 18px;}
-
+	.swatch:hover {border-width: 1px; width: 18px; height: 18px; background-position:-1px, -1px;}
+	.swatch.addLeft {border-left: 5px solid #ccc !important;}
+	
 	#output {position: relative;}
 		#image {image-rendering: pixelated;}
 		#overlay {position: absolute; top: 0; left: 0;}
@@ -102,7 +106,7 @@
 				var althsl = [(hsl[0]+0.5)%1, (hsl[1]+0.5)%1, (hsl[2]+0.5)%1];
 				
 				unique_colours.all.push(unique_colours[unq] = u = {
-					rgba: "rgba(" + colours[i] + "," + colours[i + 1] + "," + colours[i + 2] + "," + colours[i + 3] + ")",
+					rgba: "rgba(" + colours[i] + "," + colours[i + 1] + "," + colours[i + 2] + "," + colours[i + 3] / 255 + ")",
 					colour: [colours[i], colours[i + 1], colours[i + 2], colours[i + 3]],
 					hsl: hsl, contrasting: `hsl(${althsl[0]*360},${althsl[1]*100}%,${althsl[2]*100}%)`,
 					sort_by: {
@@ -130,8 +134,6 @@
 		unqs = unqs.map(function(v) {
 			return unique_colours[v];
 		});
-
-		// console.log(unqs);
 
 
 		// store position ordering
@@ -205,6 +207,7 @@
 		sort_col.onclick = sorter("rgba");
 		sort_hsl.onclick = sorter("hsl");
 
+
 		for (var i = 0, l = unqs.length; i < l; i++) {
 			var unq = unqs[i];
 			if (typeof unq != "number") {
@@ -215,20 +218,23 @@
 					var point = unq.points[p];
 					instructions.push(`ctx.rect(${point[0]},${point[1]},1,1);`);
 				}
-				//   console.log(instructions);
 
 				// make swatch
 				var swatch = document.createElement("span");
 				swatch.className = "swatch";
 				swatch.title = unq.rgba + " x " + unq.points.length + "pixels";
-				swatch.style.backgroundColor = unq.rgba;
+				swatch.style.backgroundImage = `
+					linear-gradient(${unq.rgba}, ${unq.rgba}),
+					url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABQAAAAUCAYAAACNiR0NAAAASElEQVQ4T2NsaGj4z4AG6uvr0YUYGhsbMcSwqWMcNRAcThSF4X8gQA9tYiMAmzrGUQPBwUlRGI4mbMoTNtXDcDRhU56wqR2GAFADmuNMnSdvAAAAAElFTkSuQmCC)
+					`;
 				swatch.style.borderColor = unq.contrasting;
 				swatch.unq = unq;
+				
 				(function(instructions) {
 					swatch.onmouseover = function() {
 						var unq = this.unq;
 						
-						console.log(this.unq);
+						// console.log(this.unq);
 						overlay.className = "on";
 						var ctx = overlay.ctx;
 						ctx.clearRect(0,0, canvas.width,canvas.height);
@@ -254,11 +260,57 @@
 				})(
 					new Function("ctx", instructions.join(""))
 				);
+				
+				swatch.draggable = true;
+				
 				swatches.appendChild(swatch);
 				unq.swatch = swatch;
 			}
 		}
 		sort_hsl.onclick();
+
+
+		var swatch_dragged = null;
+
+		swatches.ondragstart = function(e) {
+			console.log("dragstart", e.target.unq.rgba);
+			swatch_dragged = e.target;
+		}
+		swatches.ondragend = function(e) {
+			swatch_dragged = null;
+		}
+
+		swatches.ondragover = function(e) {
+			e.preventDefault();
+		};
+		swatches.ondragenter = function(e) {
+			var t = e.target;
+			console.log(t.classList);
+			if (t.classList.contains("swatch")) {
+				t.className = "swatch addLeft";
+			}
+		};
+		swatches.ondragleave = function(e) {
+			var t = e.target;
+			if (t.classList.contains("swatch")) {
+				t.className = "swatch";
+			}
+		};
+		
+		swatches.ondrop = function(e) {
+			e.preventDefault();
+			var t = e.target;
+			
+			console.log("drop on", e.target.unq.rgba);
+			if (swatch_dragged) {
+				swatch_dragged.parentNode.insertBefore(swatch_dragged, e.target);
+				swatch_dragged = null;
+			}
+			
+			if (t.classList.contains("swatch")) {
+				t.className = "swatch";
+			}
+		};
 
 		console.log(unique_colours);
 
