@@ -1,0 +1,320 @@
+<!doctype html>
+<style type="text/css">
+	body { text-align:center; }
+	.card { display:inline-block;
+			text-align:center;
+	}
+	.controls { margin:1em; }
+	#drawn { line-height:0; margin:1em; }
+	#drawn .card { }
+	#play_controls { display:none; }
+	h1 { margin:1em; font-size:200%; font-weight:bold; }
+
+	#src_input { white-space:nowrap; }
+	
+</style>
+
+<div id="shuffled" style="display:none;"></div>
+<div id="discarded" style="display:none;"></div>
+
+<div class="controls">
+	<span id="play_controls">
+		<h1 id="name_display"></h1>
+		<div id="status_display"></div>
+		<button id="draw_button" onclick="do_draw()">Draw</button>
+		<button id="discard_draw_button" onclick="do_discard(); do_draw();">Discard & Draw</button>
+		<button onclick="do_discard()" id="discard_button">Discard</button>
+		<button onclick="do_shuffle()">Shuffle</button>
+		<button onclick="edit_click()" id="edit">Edit</button>
+		<div id="drawn"></div>
+	</span>
+	<span id="edit_controls">
+		<h1>Shuffle</h1>
+		<textarea id="src_input" rows=10 cols=50></textarea>
+<!--# Playing Cards
+English_pattern_playing_cards_deck.svg.png grid:13x4
+x1 1 1 0
+state: |0|-->
+<!--# TOT: Letters
+https://i.imgur.com/YMqN1nf.jpg
+grid:1x13 zoom:0.3
+-->
+<!--# TOT: Sights
+https://i.imgur.com/DfBm3o1.png
+grid:5x1 zoom:0.3
+-->
+<!--# TOT: Terrain
+https://i.imgur.com/CVdaynk.png
+grid:5x1 zoom:0.3
+x6 2 7 4 8
+-->
+		<br/><button id="play_start">Play</button>
+	</span>
+	
+</div>
+
+<style id="card_style" type="text/css"></style>
+<script>
+
+	var errors = [];
+	function error(message) {
+		console.error(message);
+		errors.push(message);
+	}
+
+	
+	var shuffled_cards = shuffled.childNodes,
+		drawn_cards = drawn.childNodes,
+		discarded_cards = discarded.childNodes;
+
+	var deck;
+	var card = document.createElement("span");
+	card.className = "card front";
+	card.onclick = function(e) {
+		discarded.appendChild(this);
+		update_controls();
+	};
+	
+	function to_number(str) {
+		return +str;
+	}
+
+
+		
+
+	function show_src(editing) {
+		edit_controls.style.display = editing ? "block" : "none";
+		play_controls.style.display = editing ? "none" : "block";
+	}
+	show_src(true);
+
+	play_start.onclick = function() {
+		// parse
+		deck = null;
+		errors.length = 0;
+		src_input.value.replace(scan_src, parse_src);
+		
+		if (deck) { show_src(false); }
+		else { error("Could not parse source."); }
+
+		if (errors.length > 0) {
+			alert("Could not create deck:\n\n" + errors.join("\n"));
+		}
+		else {
+			setup_deck();
+		}
+	};
+
+	
+	function edit_click() {
+		// generate state
+		if (drawn_cards.length || discarded_cards.length) {
+			var state = "";
+			if (shuffled_cards.length < discarded_cards.length) {
+				state += cards_state(shuffled_cards);
+			}
+			state += "|";
+			if (drawn_cards.length > 0) {
+				state += cards_state(drawn_cards);
+			}
+			state += "|";
+			if (discarded_cards.length <= shuffled_cards.length) {
+				state += cards_state(discarded_cards);
+			}
+			src_input.value = src_input.value.replace(/\n(?:state:.+)/, "");
+			src_input.value += "\nstate:" + state;
+		}
+		
+		show_src(true);
+	};
+
+	
+
+	function cards_state(cards) {
+		var indices = [];
+		for (var i = 0; i < cards.length; i++) {
+			indices.push(cards[i].dataset.index);
+		}
+		return indices.join(" ");
+	}
+
+	function card_to_index(c) {
+		return c.dataset.index;
+	}
+
+
+
+	var scan_src = /^\#[ \t]*(\S[^\n]+)\n([^$ \t\n]+)(?:\n(px|grid):(\d+(?:\.\d+)?)x(\d+(?:\.\d+)?))?(?: zoom:(\d+(?:\.\d+)?))?$(?:\nx(\d+(?: \d+)*))?$(?:\nstate: ?(.+))?$/gm;
+	var parse_src = function(m,
+		name,
+		url, layout, width, height, zoom,
+		quantities, state
+	) {
+		quantities = quantities ? quantities.split(" ").map(n => +n) : [1];
+
+		console.log("read state", state);
+		
+		if (state) {
+			var s = state.match(/^(.*)\|(.*)\|(.*)$/);
+			if (s) {
+				state = {
+					not_discarded: state_to_indices(s[1]),
+					was_drawn: state_to_indices(s[2]),
+					was_discarded: state_to_indices(s[3])
+				};
+			}
+			else {
+				console.error(`Invalid state: ${state}`);
+			}
+		}
+		console.log("parsed state", state);
+		
+		var img = new Image();
+		deck = { url, layout, width, height, zoom: zoom||1, img,
+					name,
+				quantities, state
+		};
+		
+		img.onload = function() {
+			setup_deck();
+		};
+
+		name_display.innerText = "Loading...";
+		status_display.innerText = "";
+
+		img.src = url;
+	};
+
+	function state_to_indices(state) {
+		return state ? state.split(" ").map(to_number) : null;
+	}
+
+	function setup_deck() {
+		name_display.innerText = deck.name;
+		
+		switch (deck.layout) {
+			case "px":
+				deck.cwidth = deck.width; deck.cheight = deck.height;
+				deck.gwidth = Math.round(deck.img.width/deck.width) * deck.cwidth;
+				deck.gheight = Math.round(deck.img.height/deck.height) * deck.cheight;
+				break;
+			case "grid":
+				deck.cwidth = deck.img.width/deck.width; deck.cheight = deck.img.height/deck.height;
+				deck.gwidth = deck.width; deck.gheight = deck.height;
+				break;
+		}
+
+		card_style.innerHTML = `
+			.card {
+				line-height:${deck.cheight}px;
+				width: ${deck.zoom * deck.cwidth}px;
+				height: ${deck.zoom * deck.cheight}px;
+			}
+			.card.front {
+				background:url('${deck.url}') no-repeat;
+				background-size: ${deck.zoom * deck.img.width}px ${deck.zoom * deck.img.height}px;
+			}
+			#drawn { min-height:${deck.cheight}px; }
+		`;
+
+		shuffled.innerHTML = "";
+		drawn.innerHTML = "";
+		discarded.innerHTML = "";
+	
+		var q, use_last = false;
+		for (var i = 0; i < deck.gwidth * deck.gheight; i++) {
+			if (!use_last) {
+				if (i >= deck.quantities.length) {
+					use_last = true;
+					q = deck.quantities[deck.quantities.length - 1];
+				}
+				else {
+					q = deck.quantities[i];
+				}
+			}
+
+			// if (q > 0) { console.log(i, q, use_last); }
+			for (var j = 0; j < q; j++) {
+				add_card(i);
+			}
+		}
+
+		if (deck.state) {
+			console.log("setting up state", deck.state);
+			if (deck.state.was_drawn) {
+				move_all_indices(deck.state.was_drawn, shuffled, drawn);
+			}
+			if (deck.state.not_discarded) {
+				move_all(shuffled, discarded);
+				move_all_indices(deck.state.not_discarded, discarded, shuffled);
+			}
+			if (deck.state.was_discarded) {
+				move_all_indices(deck.state.was_discarded, shuffled, discarded);
+			}
+		}
+
+		update_controls();
+	}
+
+	var adding_x_y = {};
+	function add_card(index) {
+		var xy = index_to_x_y(index, adding_x_y);
+		var c = card.cloneNode(true);
+		
+		c.dataset.index = shuffled_cards.length;
+		
+		c.onclick = card.onclick;
+		c.style.backgroundPosition = `${-xy.x * deck.cwidth * deck.zoom}px
+		  ${-xy.y * deck.cheight * deck.zoom}px`;
+
+		shuffled.appendChild(c);
+	}
+	function index_to_x_y(index, out) {
+		out.x = (index % deck.gwidth);
+		out.y = Math.floor((index - out.x) / deck.gwidth);
+		return out;
+	}
+
+	function do_draw() {
+		drawn.appendChild(
+			shuffled_cards[shuffled_cards.length * Math.random() | 0]
+		);
+
+		update_controls();
+	}
+	function do_discard() {
+		move_all(drawn, discarded);
+
+		update_controls();
+	}
+	function do_shuffle() {
+		move_all(drawn, shuffled);
+		move_all(discarded, shuffled);
+
+		update_controls();
+	}
+
+	function move_all(from, to) {
+		while (from.childNodes.length > 0) {
+			to.appendChild(from.childNodes[0]);
+		}
+	}
+	function move_all_indices(indices, from, to) {
+		for (var i = 0; i <indices.length; i++) {
+			var c = from.querySelector(`.card[data-index="${indices[i]}"]`);
+			if (c) { to.appendChild(c); }
+			else { console.error(`Could not find card with index ${indices[i]}`); }
+		}
+	}
+
+	function update_controls() {
+		draw_button.disabled = discard_draw_button.disabled =
+			!(shuffled_cards.length > 0);
+		discard_button.disabled = 
+			(shuffled_cards.length === 0 && drawn_cards.length === 0);
+
+		status_display.innerText = `${shuffled_cards.length} shuffled | ${drawn_cards.length} drawn | ${discarded_cards.length} discarded`;
+	}
+
+	
+</script>
