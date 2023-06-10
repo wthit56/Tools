@@ -8,220 +8,307 @@
 	#drawn { line-height:0; margin:1em; }
 	#drawn .card { }
 	#play_controls { display:none; }
-	h1 { margin:1em; font-size:200%; font-weight:bold; }
+	h1 { margin:1em; font-size:200%; font-weight:bold; margin:0; }
 
+	#shuffled { display:none; zoom:0.5; }
+	#discarded { display:none; zoom:0.5; }
+	
 	#src_input { white-space:nowrap; }
+
+	#prototype { display:none; }
+
+	body .play_mode { display:none; }
+	body.is-playing .edit_mode { display:none; }
+	body.is-playing .play_mode { display:inherit; }
 	
 </style>
 
-<div id="shuffled" style="display:none;"></div>
-<div id="discarded" style="display:none;"></div>
 
-<div class="controls">
-	<span id="play_controls">
+
+<div id="prototype">
+	<span class="card"></span>
+	<div class="deck">
 		<h1 id="name_display"></h1>
 		<div id="status_display"></div>
-		<button id="draw_button" onclick="do_draw()">Draw</button>
-		<button id="discard_draw_button" onclick="do_discard(); do_draw();">Discard & Draw</button>
-		<button onclick="do_discard()" id="discard_button">Discard</button>
-		<button onclick="do_shuffle()">Shuffle</button>
-		<button onclick="edit_click()" id="edit">Edit</button>
+	
+		<button id="draw_button">Draw</button>
+		<button id="discard_draw_button">Discard & Draw</button>
+		<button id="discard_button">Discard</button>
+		<button id="shuffle_button">Shuffle</button>
+		
 		<div id="drawn"></div>
-	</span>
-	<span id="edit_controls">
-		<h1>Shuffle</h1>
-		<textarea id="src_input" rows=10 cols=50></textarea>
-<!--# Playing Cards
-English_pattern_playing_cards_deck.svg.png grid:13x4
-x1 1 1 0
-state: |0|-->
-<!--# TOT: Letters
+	
+		<div id="shuffled"></div>
+		<div id="discarded"></div>
+	</div>
+</div>
+
+<div class="play_mode">
+	<button onclick="show_src(true)" id="edit_button">Edit</button>	
+	<div id="decks_shown"></div>
+</div>
+<div class="edit_mode">
+	<h1>Shuffle</h1>
+	<textarea id="src_input" rows=10 cols=50></textarea>
+	<br/><button id="play_button">Play</button>
+</div>
+
+
+
+<!--
+# Aces
+http://127.0.0.1:8887/English_pattern_playing_cards_deck.svg.png
+grid:13x4
+x1 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 1 0
+state:|0 1 2 3|
+
+# 2s
+http://127.0.0.1:8887/English_pattern_playing_cards_deck.svg.png
+grid:13x4
+x0 1 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 1 0
+state:|0 1 2 3|
+-->
+		
+<!--
+# TOT: Letters Setup
 https://i.imgur.com/YMqN1nf.jpg
-grid:1x13 zoom:0.3
--->
-<!--# TOT: Sights
+grid:1x13
+zoom:0.3
+
+# TOT: Sights Setup
 https://i.imgur.com/DfBm3o1.png
-grid:5x1 zoom:0.3
--->
-<!--# TOT: Terrain
+grid:5x1
+zoom:0.3
+
+# TOT: Terrain
 https://i.imgur.com/CVdaynk.png
-grid:5x1 zoom:0.3
+grid:5x1
+zoom:0.3
 x6 2 7 4 8
 -->
-		<br/><button id="play_start">Play</button>
-	</span>
-	
-</div>
+
 
 <style id="card_style" type="text/css"></style>
 <script>
+	var prototype = document.getElementById("prototype");
+	prototype.parentNode.removeChild(prototype);
+	prototype.id = "";
 
+	function to_number(str) { return +str; }
+	var find_integers = /\d+/g;
+	
 	var errors = [];
 	function error(message) {
-		console.error(message);
 		errors.push(message);
+		console.error(message);
+	}
+	errors.report = function() {
+		if (errors.length > 0) {
+			alert("Could not create deck(s) for the following reasons:\n\n"
+				  + errors.join("\n"));
+			return true;
+		}
 	}
 
-	
-	var shuffled_cards = shuffled.childNodes,
-		drawn_cards = drawn.childNodes,
-		discarded_cards = discarded.childNodes;
-
-	var deck;
-	var card = document.createElement("span");
-	card.className = "card front";
-	card.onclick = function(e) {
-		discarded.appendChild(this);
-		update_controls();
-	};
-	
-	function to_number(str) {
-		return +str;
-	}
-
-
+	var adding_x_y = {};
+	function create_card(deck, gindex, dindex) {
+		console.log(deck.name, gindex, dindex);
+		var xy = index_to_x_y(deck, gindex, adding_x_y);
+		var c = deck.card_prototype.cloneNode(true);
 		
+		c.dataset.index = dindex;
+		
+		c.style.backgroundPosition = `${-xy.x * deck.cwidth * deck.zoom}px
+		  ${-xy.y * deck.cheight * deck.zoom}px`;
+
+		return c;
+	}
+	function index_to_x_y(deck, index, out) {
+		out.x = (index % deck.gwidth);
+		out.y = Math.floor((index - out.x) / deck.gwidth);
+		return out;
+	}
+
+	function indices_of(nodes) {
+		return [...nodes].map(function(c) { return c.dataset.index; });
+	}
+
+	var decks = [], deck;
 
 	function show_src(editing) {
-		edit_controls.style.display = editing ? "block" : "none";
-		play_controls.style.display = editing ? "none" : "block";
+		if (!editing) { document.body.classList.add("is-playing"); }
+		else { document.body.classList.remove("is-playing"); }
 	}
 	show_src(true);
 
-	play_start.onclick = function() {
-		// parse
-		deck = null;
-		errors.length = 0;
-		src_input.value.replace(scan_src, parse_src);
-		
-		if (deck) { show_src(false); }
-		else { error("Could not parse source."); }
-
-		if (errors.length > 0) {
-			alert("Could not create deck:\n\n" + errors.join("\n"));
+	function generate_state(deck) {
+		if (deck.drawn.childNodes.length > 0 || deck.discarded.childNodes.length > 0) {
+			var use_shuffled = deck.shuffled.childNodes.length < deck.discarded.childNodes.length;
+			return `
+state: ${
+				use_shuffled ? indices_of(deck.shuffled.childNodes).join(" ") : ""
+			}|${
+				indices_of(deck.drawn.childNodes).join(" ")
+			}|${
+				!use_shuffled ? indices_of(deck.discarded.childNodes).join(" ") : ""
+			}`;
 		}
 		else {
-			setup_deck();
+			return "";
 		}
-	};
-
+	}
 	
-	function edit_click() {
-		// generate state
-		if (drawn_cards.length || discarded_cards.length) {
-			var state = "";
-			if (shuffled_cards.length < discarded_cards.length) {
-				state += cards_state(shuffled_cards);
-			}
-			state += "|";
-			if (drawn_cards.length > 0) {
-				state += cards_state(drawn_cards);
-			}
-			state += "|";
-			if (discarded_cards.length <= shuffled_cards.length) {
-				state += cards_state(discarded_cards);
-			}
-			src_input.value = src_input.value.replace(/\n(?:state:.+)/, "");
-			src_input.value += "\nstate:" + state;
-		}
-		
+	edit_button.onclick = function() {
+		src_input.value = decks.map(function(deck) {
+			return (
+`#${deck.name}
+${deck.img_url}${
+	deck.grid ? "\ngrid: " + deck.grid
+		: deck.px ? "\npx: " + deck.px
+		: ""
+}${
+	deck.quantities ? "\nx" + deck.quantities.join(" ") : "" 
+}${ generate_state(deck.shown) }`
+			);
+		}).join("\n\n");
+
 		show_src(true);
 	};
 
-	
+	play_button.onclick = function() {
+		errors.length = 0;
+		decks.length = 0; deck = null;
+		loading_images = {};
+		loading_promises.length = 0;
+		decks_shown.innerHTML = "";
 
-	function cards_state(cards) {
-		var indices = [];
-		for (var i = 0; i < cards.length; i++) {
-			indices.push(cards[i].dataset.index);
-		}
-		return indices.join(" ");
-	}
+		src_input.value.replace(scan_src, parse_src);
+		if (decks.length === 0) { error("Found no decks."); }
+		if (errors.report()) { return; }
 
-	function card_to_index(c) {
-		return c.dataset.index;
-	}
-
-
-
-	var scan_src = /^\#[ \t]*(\S[^\n]+)\n([^$ \t\n]+)(?:\n(px|grid):(\d+(?:\.\d+)?)x(\d+(?:\.\d+)?))?(?: zoom:(\d+(?:\.\d+)?))?$(?:\nx(\d+(?: \d+)*))?$(?:\nstate: ?(.+))?$/gm;
-	var parse_src = function(m,
-		name,
-		url, layout, width, height, zoom,
-		quantities, state
-	) {
-		quantities = quantities ? quantities.split(" ").map(n => +n) : [1];
-
-		console.log("read state", state);
-		
-		if (state) {
-			var s = state.match(/^(.*)\|(.*)\|(.*)$/);
-			if (s) {
-				state = {
-					not_discarded: state_to_indices(s[1]),
-					was_drawn: state_to_indices(s[2]),
-					was_discarded: state_to_indices(s[3])
-				};
-			}
-			else {
-				console.error(`Invalid state: ${state}`);
-			}
-		}
-		console.log("parsed state", state);
-		
-		var img = new Image();
-		deck = { url, layout, width, height, zoom: zoom||1, img,
-					name,
-				quantities, state
-		};
-		
-		img.onload = function() {
-			setup_deck();
-		};
-
-		name_display.innerText = "Loading...";
-		status_display.innerText = "";
-
-		img.src = url;
+		// load images, setup decks
+		Promise.all(
+			decks.map(function(deck) {
+				return new Promise(function(resolve, reject) {
+					var img = deck.img = new Image();
+					img.onload = function() { resolve(); };
+					img.onerror = function() {
+						error(`Could not load image "${deck.img_url}".`);
+						reject();
+					};
+					img.src = deck.img_url;
+				});
+			})
+		).then(function then() {
+			console.log(decks);
+			decks.forEach(setup_deck);
+			if (errors.report()) { return; }
+			
+			show_src(false);
+		}, function do_catch() {
+			errors.report();
+		});
 	};
 
-	function state_to_indices(state) {
-		return state ? state.split(" ").map(to_number) : null;
+	var loading_images;
+	var loading_promises = [];
+	
+	var scan_src = /^\#[ \t]*(\S.*)$|^x(?=\d)(.+)$|^((?:file|https?):.+)$|^(\w+):[ \t]*(.+)$/gm;
+	function parse_src(m,
+		name, quantities, url,
+		key, value
+	) {
+		if (errors.length > 0) { return; }
+		
+		if (name) {
+			if (deck && !deck.img_url) {
+				error("No image defined for deck.");
+				return;
+			}
+			decks.push(deck = { name: name });
+		}
+		else {
+			if (!deck) { error("No name for deck."); return; }
+			
+			if (url) {
+				deck.img_url = url;
+			}
+			else if (quantities) {
+				deck.quantities = quantities;
+			}
+			else if (key) {
+				deck[key] = value;
+			}
+		}
 	}
 
-	function setup_deck() {
-		name_display.innerText = deck.name;
+
+	function setup_deck(deck) {
+		if (!("zoom" in deck)) { deck.zoom = 1; }
 		
-		switch (deck.layout) {
-			case "px":
-				deck.cwidth = deck.width; deck.cheight = deck.height;
-				deck.gwidth = Math.round(deck.img.width/deck.width) * deck.cwidth;
-				deck.gheight = Math.round(deck.img.height/deck.height) * deck.cheight;
-				break;
-			case "grid":
-				deck.cwidth = deck.img.width/deck.width; deck.cheight = deck.img.height/deck.height;
-				deck.gwidth = deck.width; deck.gheight = deck.height;
-				break;
-		}
+		var p = prototype.cloneNode(true);
+		var card = deck.card_prototype = p.children[0];
+		var deck_shown = deck.deck_shown = p.children[1];
+		deck.shown = deck_shown;
 
-		card_style.innerHTML = `
-			.card {
-				line-height:${deck.cheight}px;
-				width: ${deck.zoom * deck.cwidth}px;
-				height: ${deck.zoom * deck.cheight}px;
-			}
-			.card.front {
-				background:url('${deck.url}') no-repeat;
-				background-size: ${deck.zoom * deck.img.width}px ${deck.zoom * deck.img.height}px;
-			}
-			#drawn { min-height:${deck.cheight}px; }
-		`;
+		var shuffled = deck_shown.shuffled =
+			deck_shown.querySelector("#shuffled");
+		var shuffled_cards = shuffled.childNodes;
+		
+		var drawn = deck_shown.drawn =
+			deck_shown.querySelector("#drawn");
+		var drawn_cards = drawn.childNodes;
+		
+		var discarded = deck_shown.discarded =
+			deck_shown.querySelector("#discarded");
+		var discarded_cards = discarded.childNodes;
 
-		shuffled.innerHTML = "";
-		drawn.innerHTML = "";
-		discarded.innerHTML = "";
+
+		deck_shown.draw_button = deck_shown.querySelector("#draw_button");
+		deck_shown.discard_draw_button = deck_shown.querySelector("#discard_draw_button");
+		deck_shown.discard_button = deck_shown.querySelector("#discard_button");
 	
+		deck_shown.status_display = deck_shown.querySelector("#status_display");
+
+		
+		var status = deck_shown.querySelector("#status_display");
+		
+		deck_shown.querySelector("#name_display").innerText = deck.name;
+
+		if (deck.px) {
+			var wh = deck.px.split("x").map(to_number);
+			deck.cwidth = wh[0]; deck.cheight = wh[1];
+			deck.gwidth = Math.round(deck.img.width/wh[0]) * wh[0];
+			deck.gheight = Math.round(deck.img.height/wh[1]) * wh[1];
+		}
+		else if (deck.grid) {
+			var wh = deck.grid.split("x").map(to_number);
+			deck.cwidth = deck.img.width/wh[0]; deck.cheight = deck.img.height/wh[1];
+			deck.gwidth = wh[0]; deck.gheight = wh[1];
+		}
+		else {
+			deck.cwidth = deck.img.width;
+			deck.cheight = deck.img.height;
+			deck.gwidth = 1; deck.gheight = 1;
+		}
+		
+		// css
+		card.style.lineHeight = deck.cheight + "px";
+		card.style.width = (deck.zoom * deck.cwidth) + "px";
+		card.style.height = (deck.zoom * deck.cheight) + "px";
+		card.style.backgroundImage = `url("${deck.img_url}")`;
+		card.style.backgroundSize = `${deck.zoom * deck.img.width}px ${deck.zoom * deck.img.height}px`;
+		
+		deck_shown.querySelector("#drawn").style.minHeight = deck.cheight + "px";
+
+	
+		// add cards to shuffled deck
 		var q, use_last = false;
+		if (!deck.quantities) { q = 1; use_last = true; }
+		else {
+			deck.quantities = deck.quantities.split(" ").map(to_number);
+		}
+		
 		for (var i = 0; i < deck.gwidth * deck.gheight; i++) {
 			if (!use_last) {
 				if (i >= deck.quantities.length) {
@@ -233,65 +320,72 @@ x6 2 7 4 8
 				}
 			}
 
-			// if (q > 0) { console.log(i, q, use_last); }
-			for (var j = 0; j < q; j++) {
-				add_card(i);
+			if (q > 0) {
+				for (var j = 0; j < q; j++) {
+					shuffled.appendChild(create_card(deck, i, shuffled_cards.length));
+				}
 			}
 		}
 
+
+		// restore state
 		if (deck.state) {
+			var s = deck.state.split("|");
 			console.log("setting up state", deck.state);
-			if (deck.state.was_drawn) {
-				move_all_indices(deck.state.was_drawn, shuffled, drawn);
+			
+			if (s[1]) { // was drawn
+				move_all_indices(s[1].match(find_integers), shuffled, drawn);
 			}
-			if (deck.state.not_discarded) {
+			if (s[0]) { // not discarded
 				move_all(shuffled, discarded);
-				move_all_indices(deck.state.not_discarded, discarded, shuffled);
+				move_all_indices(s[0].match(find_integers), discarded, shuffled);
 			}
-			if (deck.state.was_discarded) {
-				move_all_indices(deck.state.was_discarded, shuffled, discarded);
+			if (s[2]) { // was discarded
+				move_all_indices(s[2].match(find_integers), shuffled, discarded);
+			}
+
+			if (!s[0] && !s[2]) { // assume the rest is discarded
+				move_all(shuffled, discarded);
 			}
 		}
 
-		update_controls();
-	}
+	
+		// click handler
+		deck_shown.addEventListener("click", function(e) {
+			console.log(e.target);
 
-	var adding_x_y = {};
-	function add_card(index) {
-		var xy = index_to_x_y(index, adding_x_y);
-		var c = card.cloneNode(true);
+			if (e.target.className == "card") {
+				discarded.prepend(e.target);
+			}
+			else { // buttons
+				switch(e.target.id) {
+					case "draw_button":
+						drawn.appendChild(shuffled_cards[shuffled_cards.length * Math.random() | 0]);
+						break;
+
+					case "discard_draw_button":
+						move_all(drawn, discarded);
+						drawn.appendChild(shuffled_cards[shuffled_cards.length * Math.random() | 0]);
+						break;
+
+					case "discard_button":
+						move_all(drawn, discarded);
+						break;
+					
+					case "shuffle_button":
+						move_all(discarded, shuffled);
+						move_all(drawn, shuffled);
+						break;
+				}
+			}
+			
+			update_controls(deck_shown);
+		}, true);
+
 		
-		c.dataset.index = shuffled_cards.length;
-		
-		c.onclick = card.onclick;
-		c.style.backgroundPosition = `${-xy.x * deck.cwidth * deck.zoom}px
-		  ${-xy.y * deck.cheight * deck.zoom}px`;
+		update_controls(deck_shown);
 
-		shuffled.appendChild(c);
-	}
-	function index_to_x_y(index, out) {
-		out.x = (index % deck.gwidth);
-		out.y = Math.floor((index - out.x) / deck.gwidth);
-		return out;
-	}
-
-	function do_draw() {
-		drawn.appendChild(
-			shuffled_cards[shuffled_cards.length * Math.random() | 0]
-		);
-
-		update_controls();
-	}
-	function do_discard() {
-		move_all(drawn, discarded);
-
-		update_controls();
-	}
-	function do_shuffle() {
-		move_all(drawn, shuffled);
-		move_all(discarded, shuffled);
-
-		update_controls();
+		decks_shown.appendChild(deck_shown);
 	}
 
 	function move_all(from, to) {
@@ -300,21 +394,28 @@ x6 2 7 4 8
 		}
 	}
 	function move_all_indices(indices, from, to) {
-		for (var i = 0; i <indices.length; i++) {
+		for (var i = 0; i < indices.length; i++) {
 			var c = from.querySelector(`.card[data-index="${indices[i]}"]`);
 			if (c) { to.appendChild(c); }
 			else { console.error(`Could not find card with index ${indices[i]}`); }
 		}
 	}
 
-	function update_controls() {
-		draw_button.disabled = discard_draw_button.disabled =
-			!(shuffled_cards.length > 0);
-		discard_button.disabled = 
-			(shuffled_cards.length === 0 && drawn_cards.length === 0);
 
-		status_display.innerText = `${shuffled_cards.length} shuffled | ${drawn_cards.length} drawn | ${discarded_cards.length} discarded`;
+
+	function update_controls(deck_shown) {
+		deck_shown.draw_button.disabled =
+		deck_shown.discard_draw_button.disabled =
+			(deck_shown.shuffled.childNodes.length === 0);
+		
+		deck_shown.discard_button.disabled = 
+			(deck_shown.shuffled.childNodes.length === 0
+			 && deck_shown.drawn.childNodes.length === 0);
+
+		deck_shown.status_display.innerText =
+			`${deck_shown.shuffled.childNodes.length} shuffled | ${
+				deck_shown.drawn.childNodes.length} drawn | ${
+				deck_shown.discarded.childNodes.length} discarded`;
 	}
-
 	
 </script>
