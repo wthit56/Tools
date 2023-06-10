@@ -299,7 +299,7 @@ ${deck.img_url}${
 		card.style.backgroundImage = `url("${deck.img_url}")`;
 		card.style.backgroundSize = `${deck.zoom * deck.img.width}px ${deck.zoom * deck.img.height}px`;
 		
-		deck_shown.querySelector("#drawn").style.minHeight = deck.cheight + "px";
+		deck_shown.querySelector("#drawn").style.minHeight = (deck.cheight * deck.zoom) + "px";
 
 	
 		// add cards to shuffled deck
