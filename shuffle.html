@@ -55,7 +55,10 @@
 <div class="edit_mode">
 	<h1>Shuffle</h1>
 	<textarea id="src_input" rows=10 cols=50></textarea>
-	<br/><button id="play_button">Play</button>
+	<br/><button id="play_button">Play</button><hr/>
+	<input id="local_images" type="file" accept="image/*" multiple />
+	<button onclick="local_images.value='';" title="Clear files">x</button>
+	<br/><em>Select files to use with "local:" decks.<br/>Clear and re-select to reload changes images</em>
 </div>
 
 
@@ -115,10 +118,14 @@ x6 2 7 4 8
 		errors.push(message);
 		console.error(message);
 	}
+	var errors_reported = false;
 	errors.report = function() {
+		if (errors_reported) { return true; }
+		
 		if (errors.length > 0) {
 			alert("Could not create deck(s) for the following reasons:\n\n"
 				  + errors.join("\n"));
+			errors_reported = true;
 			return true;
 		}
 	}
@@ -181,7 +188,7 @@ x6 2 7 4 8
 		src_input.value = decks.map(function(deck) {
 			return (
 `#${deck.name}
-${deck.img_url}${
+${deck.local ? "local:"+deck.local : deck.img_url}${
 	deck.grid ? "\ngrid: " + deck.grid
 		: deck.px ? "\npx: " + deck.px
 		: ""
@@ -205,12 +212,20 @@ ${deck.img_url}${
 	};
 
 	play_button.onclick = function() {
+		errors_reported = false;
 		errors.length = 0;
 		decks.length = 0; deck = null;
 		loading_images = {};
 		loading_promises.length = 0;
 		decks_shown.innerHTML = "";
 
+		var local_images_by_name = {};
+		if (local_images.files.length > 0) {
+			for (var i = 0; i < local_images.files.length; i++) {
+				local_images_by_name[local_images.files[i].name] = local_images.files[i];
+			}
+		}
+		
 		src_input.value.replace(scan_src, parse_src);
 		if (decks.length === 0) { error("Found no decks."); }
 		if (errors.report()) { return; }
@@ -218,15 +233,43 @@ ${deck.img_url}${
 		// load images, setup decks
 		Promise.all(
 			decks.map(function(deck) {
-				return new Promise(function(resolve, reject) {
-					var img = deck.img = new Image();
-					img.onload = function() { resolve(); };
-					img.onerror = function() {
-						error(`Could not load image "${deck.img_url}".`);
-						reject();
-					};
-					img.src = deck.img_url;
-				});
+				if (deck.img_url) {
+					return new Promise(function(resolve, reject) {
+						var img = deck.img = new Image();
+						img.onload = resolve;
+						img.onerror = function() {
+							error(`Could not load image "${deck.img_url}".`);
+							reject();
+						};
+						img.src = deck.img_url;
+					});
+				}
+				else if (deck.local) {
+					var deck_local_file = local_images_by_name[deck.local];
+					if (deck_local_file) {
+						return new Promise(function(resolve, reject) {
+							var FR = new FileReader();
+							FR.onload = function() {
+								deck.img_url = URL.createObjectURL(new Blob([FR.result]),
+									{ type: deck_local_file.type });
+								deck.img = new Image();
+								deck.img.onload = resolve;
+								deck.img.src = deck.img_url;
+							};
+							FR.onerror = function() {
+								error(`Could not load local image "${deck_local_file.name}".`);
+								reject();
+							};
+							FR.readAsArrayBuffer(deck_local_file);
+						});
+					}
+					else {
+						error(`Local image "${deck.local}" not selected.`);
+					}
+				}
+				else {
+					error(`No image defined for deck "${deck.name}".`);
+				}
 			})
 		).then(function then() {
 			decks.forEach(setup_deck);
@@ -279,7 +322,6 @@ ${deck.img_url}${
 
 		if (!("margin" in deck)) { deck.margin = { x:0, y:0 }; }
 		else {
-			console.log(deck.margin);
 			var m = deck.margin.match(/^(\d+)(?:[ \t]+(\d+))?$/);
 			if (!m) {
 				error(`Invalid margin: "${deck.margin}".`);
@@ -294,7 +336,6 @@ ${deck.img_url}${
 				}
 			}
 		}
-		console.log(deck.margin);
 		
 		var p = prototype.cloneNode(true);
 		var card = deck.card_prototype = p.children[0];
