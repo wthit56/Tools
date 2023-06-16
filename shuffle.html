@@ -1,17 +1,22 @@
 <!doctype html>
 <style type="text/css">
 	body { text-align:center; }
-	.card { display:inline-block;
-			text-align:center;
-	}
+	.card { display:inline-block; text-align:center; width:150px; height:200px; }
+	.card.text { box-shadow:0 0 1px black; }
 	.controls { margin:1em; }
+	
 	#drawn { line-height:0; margin:1em; }
-	#drawn .card { margin:5px; }
-	#play_controls { display:none; }
-	h1 { margin:1em; font-size:200%; font-weight:bold; margin:0; }
+	#drawn .card { margin:5px; line-height:normal; }
+	#drawn .card.text { position:relative; background-color:white; color:black; }
+	#drawn .card.text .content { position:absolute; top:50%; transform:translateY(-50%); width:100%; max-height:100%; pointer-events:none; }
 
 	#shuffled { display:none; zoom:0.5; }
 	#discarded { display:none; zoom:0.5; }
+
+	#play_controls { display:none; }
+	
+	h1 { margin:1em; font-size:200%; font-weight:bold; margin:0; }
+
 	
 	#src_input { white-space:nowrap; }
 
@@ -19,15 +24,13 @@
 
 	body .play_mode { display:none; }
 	body.is-playing .edit_mode { display:none; }
-	body.is-playing .play_mode { display:inherit; }
+	body.is-playing .play_mode { display:initial; }
 
 	.deck { outline:0; }
 	.deck:focus h1, .deck:has(button:focus) h1
 		{ text-decoration:underline; }
 	
 </style>
-
-
 
 <div id="prototype">
 	<span class="card"></span>
@@ -48,12 +51,19 @@
 	</div>
 </div>
 
+
+<h1 class="edit_mode">Shuffle</h1>
+
+<div>
+	<input id="bg_brightness" title="Background brightness"
+		type="range" min="0" max="100" value="100" steps="100" />
+	<button class="play_mode" onclick="show_src(true)" id="edit_button">Edit</button>
+</div>
+
 <div class="play_mode">
-	<button onclick="show_src(true)" id="edit_button">Edit</button>	
 	<div id="decks_shown"></div>
 </div>
 <div class="edit_mode">
-	<h1>Shuffle</h1>
 	<textarea id="src_input" rows=10 cols=50></textarea>
 	<br/><button id="play_button">Play</button><hr/>
 	<input id="local_images" type="file" accept="image/*" multiple />
@@ -62,6 +72,19 @@
 </div>
 
 
+<!--
+#Die
+px: 100x100
+font:90px Arial
+zoom:2
+1x 1
+1x 2
+1x 3
+1x 4
+1x 5
+1x 6
+state: -|*|-
+-->
 <!--
 # Helvetica Playing Cards
 http://3.bp.blogspot.com/_w_0zEaXF8y8/TT3-sC0g6KI/AAAAAAAAAC0/ff4xXts7bfw/s1600/grid.jpg
@@ -183,12 +206,28 @@ x6 2 7 4 8
 			return "";
 		}
 	}
+
+	function regen_text_cards(cards) {
+		var f = undefined;
+		var out = "";
+		for (var i = 0; i < cards.length; i++) {
+			if (f != cards[i].font) {
+				f = cards[i].font;
+				out += "\nfont:" + f;
+			}
+			out += `\n${cards[i].quantity}x ${cards[i].content}`
+		}
+		return out;
+	}
 	
 	edit_button.onclick = function() {
 		src_input.value = decks.map(function(deck) {
 			return (
-`#${deck.name}
-${deck.local ? "local:"+deck.local : deck.img_url}${
+`#${deck.name}${
+	deck.local ? "\nlocal:"+deck.local
+	: deck.img_url ? "\n" + deck.img_url
+	: ""
+}${
 	deck.grid ? "\ngrid: " + deck.grid
 		: deck.px ? "\npx: " + deck.px
 		: ""
@@ -204,13 +243,23 @@ ${deck.local ? "local:"+deck.local : deck.img_url}${
 		: ""
 }${
 	deck.quantities ? "\nx" + deck.quantities.join(" ") : "" 
-}${ generate_state(deck.shown) }`
+}${
+	deck.text_cards ? regen_text_cards(deck.text_cards) : ""
+}${
+	generate_state(deck.shown)
+}`
 			);
 		}).join("\n\n");
 
 		show_src(true);
 	};
 
+	bg_brightness.oninput = function() {
+		document.body.style.backgroundColor = `rgba(0,0,0,${100 - (bg_brightness.value)}%)`;
+		document.body.style.color = (bg_brightness.value > 50) ? "black" : "white";
+		console.log(bg_brightness.value, document.body.style.backgroundColor);
+	};
+				
 	play_button.onclick = function() {
 		errors_reported = false;
 		errors.length = 0;
@@ -267,8 +316,8 @@ ${deck.local ? "local:"+deck.local : deck.img_url}${
 						error(`Local image "${deck.local}" not selected.`);
 					}
 				}
-				else {
-					error(`No image defined for deck "${deck.name}".`);
+				else if (!deck.text_cards) {
+					error(`No image or text cards defined for deck "${deck.name}".`);
 				}
 			})
 		).then(function then() {
@@ -284,9 +333,10 @@ ${deck.local ? "local:"+deck.local : deck.img_url}${
 	var loading_images;
 	var loading_promises = [];
 	
-	var scan_src = /^\#[ \t]*(\S.*)$|^x(?=\d)(.+)$|^((?:file|https?):.+)$|^(\w+):[ \t]*(.+)$/gm;
+	var scan_src = /^\#[ \t]*(\S.*)$|^x((?:\d+[ \t]*)+)$|^((?:file|https?):.+)$|^(\d+)x[ \t]+(.+)$|^(\w+):[ \t]*(.+)$/gm;
 	function parse_src(m,
 		name, quantities, url,
+		text_quantity, text,
 		key, value
 	) {
 		if (errors.length > 0) { return; }
@@ -306,6 +356,17 @@ ${deck.local ? "local:"+deck.local : deck.img_url}${
 			}
 			else if (quantities) {
 				deck.quantities = quantities;
+			}
+			else if (text_quantity) {
+				var q = parseInt(text_quantity);
+				if (text) {
+					if (!deck.text_cards) { deck.text_cards = []; }
+					deck.text_cards.push({ quantity:q, font:deck.font, content:text });
+				}
+				else {
+					error(`Text card has no content.`);
+					return;
+				}
 			}
 			else if (key) {
 				deck[key] = value;
@@ -368,8 +429,10 @@ ${deck.local ? "local:"+deck.local : deck.img_url}${
 		
 		deck_shown.querySelector("#name_display").innerText = deck.name;
 
-		var iwidth = deck.img.width - (deck.margin.x * 2);
-		var iheight = deck.img.height - (deck.margin.y * 2);
+		if (deck.img) {
+			var iwidth = deck.img.width - (deck.margin.x * 2);
+			var iheight = deck.img.height - (deck.margin.y * 2);
+		}
 		
 		if (deck.px) {
 			var wh = deck.px.split("x").map(to_number);
@@ -389,11 +452,22 @@ ${deck.local ? "local:"+deck.local : deck.img_url}${
 		}
 		
 		// css
-		card.style.lineHeight = deck.cheight + "px";
-		card.style.width = (deck.zoom * deck.cwidth) + "px";
-		card.style.height = (deck.zoom * deck.cheight) + "px";
-		card.style.backgroundImage = `url("${deck.img_url}")`;
-		card.style.backgroundSize = `${deck.zoom * deck.img.width}px ${deck.zoom * deck.img.height}px`;
+		// card.style.lineHeight = deck.cheight + "px";
+		
+		if (deck.text_cards) {
+			card.style.width = deck.cwidth + "px";
+			card.style.height = deck.cheight + "px";
+			card.style.zoom = deck.zoom;
+		}
+		else {
+			card.style.width = (deck.zoom * deck.cwidth) + "px";
+			card.style.height = (deck.zoom * deck.cheight) + "px";
+		}
+		
+		if (deck.img_url) {
+			card.style.backgroundImage = `url("${deck.img_url}")`;
+			card.style.backgroundSize = `${deck.zoom * deck.img.width}px ${deck.zoom * deck.img.height}px`;
+		}
 		
 		deck_shown.drawn.style.minHeight = (deck.cheight * deck.zoom) + "px";
 
@@ -404,31 +478,63 @@ ${deck.local ? "local:"+deck.local : deck.img_url}${
 		else {
 			deck.quantities = deck.quantities.split(" ").map(to_number);
 		}
+
 		
-		for (var i = 0; i < deck.gwidth * deck.gheight; i++) {
-			if (!use_last) {
-				if (i >= deck.quantities.length) {
-					use_last = true;
-					q = deck.quantities[deck.quantities.length - 1];
+		var i = 0;
+		if (deck.img) {
+			for (; i < deck.gwidth * deck.gheight; i++) {
+				if (!use_last) {
+					if (i >= deck.quantities.length) {
+						use_last = true;
+						q = deck.quantities[deck.quantities.length - 1];
+					}
+					else {
+						q = deck.quantities[i];
+					}
 				}
-				else {
-					q = deck.quantities[i];
+	
+				if (q > 0) {
+					var xy = index_to_x_y(deck, i, adding_x_y);
+					var c = deck.card_prototype.cloneNode(true);
+					c.dataset.index = i;
+					
+					c.style.backgroundPosition =
+						`${(-deck.margin.x + (-xy.x * deck.cwidth)) * deck.zoom}px
+						 ${(-deck.margin.y + (-xy.y * deck.cheight)) * deck.zoom}px`;
+	
+					shuffled.appendChild(c);
+					
+					for (var j = 1; j < q; j++) {
+						shuffled.appendChild(c.cloneNode(true));
+					}
 				}
 			}
+		}
 
-			if (q > 0) {
-				var xy = index_to_x_y(deck, i, adding_x_y);
-				var c = deck.card_prototype.cloneNode(true);
-				c.dataset.index = i;
-				
-				c.style.backgroundPosition =
-					`${(-deck.margin.x + (-xy.x * deck.cwidth)) * deck.zoom}px
-					 ${(-deck.margin.y + (-xy.y * deck.cheight)) * deck.zoom}px`;
 
-				shuffled.appendChild(c);
+		// text cards
+		if (deck.text_cards) {
+			var offset = i;
+			card.style.backgroundImage = "";
+			card.className = "card text";
+			for (i = 0; i < deck.text_cards.length; i++) {
+				var t = deck.text_cards[i];
+				var q = t.quantity;
+	
+				if (q > 0) {
+					var c = card.cloneNode(true);
+					var content = c.appendChild(document.createElement("div"));
+					content.className = "content";
+					content.innerHTML = t.content;
+
+					c.dataset.index = offset + i;
+					c.style.font = t.font;
+
+					shuffled.appendChild(c);
 				
-				for (var j = 1; j < q; j++) {
-					shuffled.appendChild(c.cloneNode(true));
+					for (var j = 1; j < q; j++) {
+						shuffled.appendChild(c.cloneNode(true));
+					}
 				}
 			}
 		}
@@ -468,7 +574,7 @@ ${deck.local ? "local:"+deck.local : deck.img_url}${
 
 			// deck_shown.focus();
 
-			if (e.target.className == "card") {
+			if (e.target.classList.contains("card")) {
 				discarded.prepend(e.target);
 			}
 			else { // buttons
@@ -504,7 +610,6 @@ ${deck.local ? "local:"+deck.local : deck.img_url}${
 			e.preventDefault();
 			e.stopPropagation();
 
-			console.log(e.key);
 			switch(e.key) {
 				case "1": case "2": case "3": case "4": case "5":
 				case "6": case "7": case "8": case "9":
