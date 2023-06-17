@@ -236,7 +236,7 @@ x6 2 7 4 8
 	edit_button.onclick = function() {
 		src_input.value = decks.map(function(deck) {
 			if (deck.info) {
-				return "." + (deck.side ? "<" : "") + " " + deck;
+				return "." + (deck.side ? "<" : "") + " " + deck.info;
 			}
 			else {
 				return (
