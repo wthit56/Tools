@@ -4,12 +4,20 @@
 	.card { display:inline-block; text-align:center; width:150px; height:200px; }
 	.card.text { box-shadow:0 0 1px black; }
 	.controls { margin:1em; }
+
+	.info { margin:1em auto; font-size:20px; white-space:break-spaces; }
+
+	.row { display:flex; }
+	.row .deck { flex:1; }
 	
 	#drawn { line-height:0; margin:1em; }
 	#drawn .card { margin:5px; line-height:normal; }
 	#drawn .card.text { position:relative; background-color:white; color:black; }
 	#drawn .card.text .content { position:absolute; top:50%; transform:translateY(-50%); width:100%; max-height:100%; pointer-events:none; }
 
+	.deck + .deck { margin-left:1em; }
+	.deck #actions { width:100%; overflow-x:auto; white-space:nowrap; }
+	
 	#shuffled { display:none; zoom:0.5; }
 	#discarded { display:none; zoom:0.5; }
 
@@ -37,13 +45,15 @@
 	<div class="deck" tabindex="0">
 		<h1 id="name_display"></h1>
 		<div id="status_display"></div>
-	
-		<button id="draw_button" title="Draw 1 card. Press 1-9 to draw that many cards.">Draw</button>
-		<button id="draw_all_button">Draw All</button>
-		<button id="shuffle_draw_button">Shuffle & Draw</button>
-		<button id="discard_button" title="Discard all drawn cards. Press 0.">Discard</button>
-		<button id="shuffle_button" title="Shuffles all drawn and discards into the deck. Press S.">Shuffle</button>
-		
+
+		<div id="actions">
+			<button id="draw_button" title="Draw 1 card. Press 1-9 to draw that many cards.">Draw</button>
+			<button id="draw_all_button">Draw All</button>
+			<button id="roll_button" title="Shuffle all & draw 1 card">Roll</button>
+			<button id="discard_button" title="Discard all drawn cards. Press 0.">Discard</button>
+			<button id="shuffle_button" title="Shuffles all drawn and discards into the deck. Press S.">Shuffle</button>
+		</div>
+			
 		<div id="drawn"></div>
 	
 		<div id="shuffled"></div>
@@ -55,7 +65,9 @@
 <h1 class="edit_mode">Shuffle</h1>
 
 <div>
+	<label for="bg_brightness">BG:</label>
 	<input id="bg_brightness" title="Background brightness"
+		style="position:relative; top:3px;"
 		type="range" min="0" max="100" value="100" steps="100" />
 	<button class="play_mode" onclick="show_src(true)" id="edit_button">Edit</button>
 </div>
@@ -165,6 +177,7 @@ x6 2 7 4 8
 	}
 
 	var decks = [], deck;
+	var decks_row;
 
 	function show_src(editing) {
 		if (!editing) { document.body.classList.add("is-playing"); }
@@ -222,9 +235,13 @@ x6 2 7 4 8
 	
 	edit_button.onclick = function() {
 		src_input.value = decks.map(function(deck) {
-			return (
-`#${deck.name}${
-	deck.local ? "\nlocal:"+deck.local
+			if (deck.info) {
+				return "." + (deck.side ? "<" : "") + " " + deck;
+			}
+			else {
+				return (
+`#${deck.side ? "<" : ""} ${deck.name}${
+	deck.local ? "\nlocal: "+deck.local
 	: deck.img_url ? "\n" + deck.img_url
 	: ""
 }${
@@ -248,7 +265,8 @@ x6 2 7 4 8
 }${
 	generate_state(deck.shown)
 }`
-			);
+				);
+			}
 		}).join("\n\n");
 
 		show_src(true);
@@ -316,7 +334,7 @@ x6 2 7 4 8
 						error(`Local image "${deck.local}" not selected.`);
 					}
 				}
-				else if (!deck.text_cards) {
+				else if (!deck.info && !deck.text_cards) {
 					error(`No image or text cards defined for deck "${deck.name}".`);
 				}
 			})
@@ -333,23 +351,34 @@ x6 2 7 4 8
 	var loading_images;
 	var loading_promises = [];
 	
-	var scan_src = /^\#[ \t]*(\S.*)$|^x((?:\d+[ \t]*)+)$|^((?:file|https?):.+)$|^(\d+)x[ \t]+(.+)$|^(\w+):[ \t]*(.+)$/gm;
+	var scan_src = /^\#(<)?[ \t]*(\S.*)$|^x((?:\d+[ \t]*)+)$|^((?:file|https?):.+)$|^(\d+)x[ \t]+(.+)$|^\.(<)?[ \t]*(.+)$|^(\w+):[ \t]*(.+)$/gm;
 	function parse_src(m,
-		name, quantities, url,
+		deck_side, name,
+		quantities, url,
 		text_quantity, text,
+		info_side, info,
 		key, value
 	) {
 		if (errors.length > 0) { return; }
-		
+
+		if (!deck) {
+			if (deck_side) { error("Deck to the side, but no non-side before it."); return; }
+			if (info_side) { error("Info to the side, but no non-side before it."); return; }
+		}
 		if (name) {
-			if (deck && !deck.img_url) {
+			if (deck && !deck.info && !deck.img_url) {
 				error("No image defined for deck.");
 				return;
 			}
 			decks.push(deck = { name: name });
+			deck.side = deck_side;
+		}
+		else if (info) {
+			decks.push(deck = { info: info });
+			deck.side = info_side;
 		}
 		else {
-			if (!deck) { error("No name for deck."); return; }
+			if (!deck) { error(`No name for deck when finding "${m}".`); return; }
 			
 			if (url) {
 				deck.img_url = url;
@@ -376,6 +405,20 @@ x6 2 7 4 8
 
 
 	function setup_deck(deck) {
+		if (!deck.side) {
+			decks_row = decks_shown.appendChild(document.createElement("div"));
+			decks_row.className = "row";
+		}
+
+		
+		if (deck.info) { // info
+			var info = decks_row.appendChild(document.createElement("pre"));
+			info.className = "info";
+			info.innerHTML = deck.info;
+			return;
+		}
+
+		
 		if (errors.report()) { return; }
 		
 		if (!("zoom" in deck)) { deck.zoom = 1; }
@@ -418,7 +461,7 @@ x6 2 7 4 8
 
 		deck_shown.draw_button = deck_shown.querySelector("#draw_button");
 		deck_shown.draw_all_button = deck_shown.querySelector("#draw_all_button");
-		deck_shown.shuffle_draw_button = deck_shown.querySelector("#shuffle_draw_button");
+		deck_shown.roll_button = deck_shown.querySelector("#roll_button");
 		deck_shown.discard_button = deck_shown.querySelector("#discard_button");
 		deck_shown.shuffle_button = deck_shown.querySelector("#shuffle_button");
 	
@@ -453,20 +496,20 @@ x6 2 7 4 8
 		
 		// css
 		// card.style.lineHeight = deck.cheight + "px";
-		
+
+		card.style.zoom = deck.zoom;
+	
 		if (deck.text_cards) {
 			card.style.width = deck.cwidth + "px";
 			card.style.height = deck.cheight + "px";
-			card.style.zoom = deck.zoom;
 		}
 		else {
-			card.style.width = (deck.zoom * deck.cwidth) + "px";
-			card.style.height = (deck.zoom * deck.cheight) + "px";
+			card.style.width = deck.cwidth + "px";
+			card.style.height = deck.cheight + "px";
 		}
 		
 		if (deck.img_url) {
 			card.style.backgroundImage = `url("${deck.img_url}")`;
-			card.style.backgroundSize = `${deck.zoom * deck.img.width}px ${deck.zoom * deck.img.height}px`;
 		}
 		
 		deck_shown.drawn.style.minHeight = (deck.cheight * deck.zoom) + "px";
@@ -499,8 +542,8 @@ x6 2 7 4 8
 					c.dataset.index = i;
 					
 					c.style.backgroundPosition =
-						`${(-deck.margin.x + (-xy.x * deck.cwidth)) * deck.zoom}px
-						 ${(-deck.margin.y + (-xy.y * deck.cheight)) * deck.zoom}px`;
+						`${(-deck.margin.x + (-xy.x * deck.cwidth))}px
+						 ${(-deck.margin.y + (-xy.y * deck.cheight))}px`;
 	
 					shuffled.appendChild(c);
 					
@@ -587,7 +630,7 @@ x6 2 7 4 8
 						move_all(shuffled, drawn);
 						break;
 
-					case "shuffle_draw_button":
+					case "roll_button":
 						deck_shown.shuffle_button.click();
 						deck_shown.draw_button.click();
 						break;
@@ -625,12 +668,16 @@ x6 2 7 4 8
 				case "s":
 					deck_shown.shuffle_button.click();
 					break;
+
+				case "r":
+					deck_shown.roll_button.click();
+					break;
 			}
 		});
 
 		update_controls(deck_shown);
 
-		decks_shown.appendChild(deck_shown);
+		decks_row.appendChild(deck_shown);
 	}
 
 	function move_all(from, to) {
