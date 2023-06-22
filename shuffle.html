@@ -1,3 +1,4 @@
+
 <!doctype html>
 <style type="text/css">
 	body { text-align:center; }
@@ -5,15 +6,22 @@
 	.card.text { box-shadow:0 0 1px black; }
 	.controls { margin:1em; }
 
+	big { font-size:5em; }
+	med { font-size:1.5em; }
+	sml { font-size:0.7em; }
+	
+		
 	.info { margin:1em auto; font-size:20px; white-space:break-spaces; }
 
 	.row { display:flex; }
 	.row .deck { flex:1; }
+
+	textarea { outline:0; border:0.5em solid white; box-shadow:0 0 0 1px black; margin:1px; }
 	
 	#drawn { line-height:0; margin:1em; }
 	#drawn .card { margin:5px; line-height:normal; }
 	#drawn .card.text { position:relative; background-color:white; color:black; }
-	#drawn .card.text .content { position:absolute; top:50%; transform:translateY(-50%); width:100%; max-height:100%; pointer-events:none; }
+	#drawn .card.text .content { position:absolute; top:50%; transform:translateY(-50%); left:5px; right:5px; max-height:100%; pointer-events:none; }
 
 	.deck + .deck { margin-left:1em; }
 	.deck #actions { width:100%; overflow-x:auto; white-space:nowrap; }
@@ -366,7 +374,7 @@ x6 2 7 4 8
 			if (info_side) { error("Info to the side, but no non-side before it."); return; }
 		}
 		if (name) {
-			if (deck && !deck.info && !deck.img_url) {
+			if (deck && !deck.info && !deck.img_url && !deck.text_cards) {
 				error("No image defined for deck.");
 				return;
 			}
@@ -650,9 +658,11 @@ x6 2 7 4 8
 		}, true);
 
 		deck_shown.addEventListener("keyup", function(e) {
+			if (e.shiftKey || e.ctrlKey) { return; }
+			
 			e.preventDefault();
 			e.stopPropagation();
-
+			
 			switch(e.key) {
 				case "1": case "2": case "3": case "4": case "5":
 				case "6": case "7": case "8": case "9":
