@@ -1,4 +1,3 @@
-
 <!doctype html>
 <style type="text/css">
 	body { text-align:center; }
@@ -6,10 +5,14 @@
 	.card.text { box-shadow:0 0 1px black; }
 	.controls { margin:1em; }
 
-	big { font-size:5em; }
-	med { font-size:1.5em; }
-	sml { font-size:0.7em; }
-	
+	.card big { font-size:5em; }
+	.card med { font-size:1.5em; }
+	.card sml { font-size:0.7em; }
+
+	#explanation { text-align:left; line-height:140%; max-width:500px; margin:0 auto; }
+	#explanation q { background:#eee; border:1px solid #999; border-radius:3px;
+				   padding:0 2px; font-family:sans-serif; font-size:90%; }
+	#explanation q::before, #explanation q::after {content:"";}
 		
 	.info { margin:1em auto; font-size:20px; white-space:break-spaces; }
 
@@ -88,7 +91,8 @@
 	<br/><button id="play_button">Play</button><hr/>
 	<input id="local_images" type="file" accept="image/*" multiple />
 	<button onclick="local_images.value='';" title="Clear files">x</button>
-	<br/><em>Select files to use with "local:" decks.<br/>Clear and re-select to reload changes images</em>
+	<br/><em>Select files to use with "local:" decks.<br/>
+		Clear and re-select to reload changed images.</em>
 </div>
 
 
@@ -188,8 +192,12 @@ x6 2 7 4 8
 	var decks_row;
 
 	function show_src(editing) {
-		if (!editing) { document.body.classList.add("is-playing"); }
-		else { document.body.classList.remove("is-playing"); }
+		if (!editing) {
+			document.body.classList.add("is-playing");
+		}
+		else {
+			document.body.classList.remove("is-playing");
+		}
 	}
 	show_src(true);
 
@@ -724,3 +732,76 @@ x6 2 7 4 8
 	}
 	
 </script>
+
+<div class="edit_mode" id="explanation">
+	<p>Type text into the source box above, and click "Play" to load it.</p>
+	<p>Drag the BG slider at the top of the page
+		to adjust how dark/light the page background is.</p>
+	<p>
+		While playing, click "Edit" to return to the source box.
+		It will have "state" lines added to the decks to save which cards 
+		are where. The source can be saved in a text file or message, 
+		and pasted in to resume playing.
+		The source text works as follows:
+	</p>
+	<p><q># Name</q>: the name for the deck.
+		<q>#&lt; Name</q> will place the deck on the same line as the 
+		previous deck.
+	</p>
+	<p><q>http:...</q>, <q>https:...</q>:
+		the address of an image to be used for the deck.
+		<q>local:...</q> the file name of an image,
+		to be selected with the file input below the source box.
+		Click the "x" button next to the file input
+		to clear it--allowing the images to be reloaded.
+	</p>
+	<p><q>grid:5x4</q>: how many cards across and how many cards down
+		are in the image.
+		Or <q>px:200x300</q>: the size in pixels of each card.
+		If left out, the entire image will be used as one card.
+	</p>
+	<p><q>margin:5</q>: the margin to cut out around the entire image.
+		Or <q>margin:5 10</q>: the margin for left/right, 
+		and the margin for top/bottom.
+	</p>
+	<p><q>font:20px Arial</q>: the font to use for subsequent text cards
+		within this deck.
+		<em>Note, must include at least the font name.</em>
+		See <a href="https://developer.mozilla.org/en-US/docs/Web/CSS/font">MDN reference</a> 
+		for more details on how to write fonts.
+	</p>
+	<p><q>x1 2 0 1 1 19 0</q>: the quanitity of each card from the image,
+		going top-to-bottom, left-to-right.
+		<em>When left out, all cards will be included once.</em>
+		If there are more cards in the image that quantities in the list,
+		the last quantity will be used for the rest of the cards.
+	</p>
+	<p>
+		<q>5x Card text</q>: a text card--starting with the quantity,
+		and followed by the contents of the card.
+		This can include any text, emojis, and even HTML tags.
+		Here are a few useful tags, but any tags should work.
+		<em>Note, text cards are added after image cards,
+			and have a white background.</em>
+	</p>
+	<ul>
+		<li><q>&lt;br/></q>: new line.</li>
+		<li><q>&lt;hr/></q>: horizontal line, good for a border.</li>
+		<li><q>&lt;b>text&lt;/b></q>: bold text.</li>
+		<li><q>&lt;i>text&lt;/i></q>: italic text.</li>
+		<li><q>&lt;u>text&lt;/u></q>: underlined text.</li>
+		<li><q>&lt;big>text&lt;/big></q>: extra large, useful for single-icon cards.</li>
+		<li><q>&lt;med>text&lt;/med></q>: slightly larger than normal text,
+			useful for making an emoji slightly bigger to match the text,
+			or headings.</li>
+		<li><q>&lt;sml>text&lt;/sml></q>: smaller text.</li>
+	</ul>
+	<p><q>state:0 3|?|1 2 4</q>: which cards are in the shuffled deck,
+		being shown, and discarded.
+		<q>-</q> means no cards are here.
+		<q>?</q> means the cards that are not elsewhere are here.
+		<q>*</q> means all cards are here.
+		<em>You don't have to worry about how this works unless
+		you want to write it manually.</em>
+	</p>
+</div>
