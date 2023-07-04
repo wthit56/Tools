@@ -14,10 +14,12 @@
 				   padding:0 2px; font-family:sans-serif; font-size:90%; }
 	#explanation q::before, #explanation q::after {content:"";}
 		
-	.info { margin:1em auto; font-size:20px; white-space:break-spaces; }
+	.info { margin:1em auto; font-size:20px; white-space:break-spaces;
+		  box-shadow:0 0; width:100%; text-align:center; }
+	.info:focus { outline:1px solid grey; }
 
 	.row { display:flex; }
-	.row .deck { flex:1; }
+	.row .deck, .row .note { flex:1; margin:0; }
 
 	textarea { outline:0; border:0.5em solid white; box-shadow:0 0 0 1px black; margin:1px; }
 	
@@ -26,7 +28,7 @@
 	#drawn .card.text { position:relative; background-color:white; color:black; }
 	#drawn .card.text .content { position:absolute; top:50%; transform:translateY(-50%); left:5px; right:5px; max-height:100%; pointer-events:none; }
 
-	.deck + .deck { margin-left:1em; }
+	.deck + .deck, .deck + .info { margin-left:1em; }
 	.deck #actions { width:100%; overflow-x:auto; white-space:nowrap; }
 	
 	#shuffled { display:none; zoom:0.5; }
@@ -228,6 +230,7 @@ x6 2 7 4 8
 			else if (discarded <= shuffled) {
 				discarded_state = indices_of(deck.discarded.childNodes).join(" ");
 			}
+			else { discarded_state = "?"; }
 
 			return `\nstate: ${shuffled_state}|${drawn_state}|${discarded_state}`;
 		}
@@ -428,7 +431,7 @@ x6 2 7 4 8
 
 		
 		if (deck.info) { // info
-			var info = decks_row.appendChild(document.createElement("pre"));
+			var info = decks_row.appendChild(document.createElement("textarea"));
 			info.className = "info";
 			info.innerHTML = deck.info;
 			return;
@@ -601,23 +604,30 @@ x6 2 7 4 8
 
 		// restore state
 		if (deck.state) {
+			// debugger;
 			var s = deck.state.split("|");
 
-			switch(s[0]) {
+			// discarded has the rest?
+			if (s[2] === "?") {
+				move_all(shuffled, discarded);
+			}
+				
+			switch(s[0]) { // shuffled state
 				case "*": case "?": case "-": break;
 				default: 
 					move_all(shuffled, discarded);
 					move_all_indices(s[0].match(find_integers), discarded, shuffled);
 			}
 
-			switch(s[1]) {
+			switch(s[1]) { // drawn state
 				case "?": case "-": break;
 				case "*": move_all(shuffled, drawn); break;
 				default:
-					move_all_indices(s[1].match(find_integers), shuffled, drawn);
+					// from deck_shown (from any pile)
+					move_all_indices(s[1].match(find_integers), deck_shown, drawn);
 			}
 
-			switch(s[2]) {
+			switch(s[2]) { // discarded state
 				case "?": case "-": break;
 				case "*": move_all(shuffled, discarded); break;
 				default:
@@ -736,7 +746,10 @@ x6 2 7 4 8
 <div class="edit_mode" id="explanation">
 	<p>Type text into the source box above, and click "Play" to load it.</p>
 	<p>Drag the BG slider at the top of the page
-		to adjust how dark/light the page background is.</p>
+		to adjust how dark/light the page background is.
+		This can help to avoid burnout in your screen if the page
+		doesn't change for some time.
+	</p>
 	<p>
 		While playing, click "Edit" to return to the source box.
 		It will have "state" lines added to the decks to save which cards 
@@ -744,9 +757,10 @@ x6 2 7 4 8
 		and pasted in to resume playing.
 		The source text works as follows:
 	</p>
+	<p><q>. Notes</q>: An editable note that is displayed between decks.</p>
 	<p><q># Name</q>: the name for the deck.
 		<q>#&lt; Name</q> will place the deck on the same line as the 
-		previous deck.
+		previous deck or note.
 	</p>
 	<p><q>http:...</q>, <q>https:...</q>:
 		the address of an image to be used for the deck.
@@ -762,12 +776,14 @@ x6 2 7 4 8
 	</p>
 	<p><q>margin:5</q>: the margin to cut out around the entire image.
 		Or <q>margin:5 10</q>: the margin for left/right, 
-		and the margin for top/bottom.
+		and then the margin for top/bottom.
+	</p>
+	<p><q>zoom:1.2</q>: make the cards larger (> 1), or smaller (< 1).
 	</p>
 	<p><q>font:20px Arial</q>: the font to use for subsequent text cards
 		within this deck.
 		<em>Note, must include at least the font name.</em>
-		See <a href="https://developer.mozilla.org/en-US/docs/Web/CSS/font">MDN reference</a> 
+		See <a href="https://developer.mozilla.org/en-US/docs/Web/CSS/font" target="_blank">MDN reference</a> 
 		for more details on how to write fonts.
 	</p>
 	<p><q>x1 2 0 1 1 19 0</q>: the quanitity of each card from the image,
@@ -779,11 +795,15 @@ x6 2 7 4 8
 	<p>
 		<q>5x Card text</q>: a text card--starting with the quantity,
 		and followed by the contents of the card.
-		This can include any text, emojis, and even HTML tags.
-		Here are a few useful tags, but any tags should work.
-		<em>Note, text cards are added after image cards,
-			and have a white background.</em>
+		The cards will have a white background and black text.
+		Text cards are added <em>after</em> image cards.
+		This can include any text, emojis.
+		<em>Search <a href="https://symbl.cc/" target="_blank">Symbl</a> 
+		or <a href="https://emojidb.org/" target="_blank">EmojiDB</a>
+		to find emoji to use for your cards.</em>
 	</p>
+	<p>These can also include HTML tags.
+		Here are a few useful tags, but any tags should work.</p>
 	<ul>
 		<li><q>&lt;br/></q>: new line.</li>
 		<li><q>&lt;hr/></q>: horizontal line, good for a border.</li>
