@@ -1,6 +1,9 @@
 <!doctype html>
 <style type="text/css">
 	body { text-align:center; }
+	body.light-text,
+	body.light-text .row textarea { color:white; }
+	
 	.card { display:inline-block; text-align:center; width:150px; height:200px; }
 	.card.text { box-shadow:0 0 1px black; }
 	.controls { margin:1em; }
@@ -21,7 +24,14 @@
 	.row { display:flex; }
 	.row .deck, .row .note { flex:1; margin:0; }
 
-	textarea { outline:0; border:0.5em solid white; box-shadow:0 0 0 1px black; margin:1px; }
+	textarea#source {
+		outline:0; border:0.5em solid white; box-shadow:0 0 0 1px black; margin:1px;
+	}
+
+	.row textarea {
+		border-color:transparent;
+		background:transparent; colour:inherit;
+	}
 	
 	#drawn { line-height:0; margin:1em; }
 	#drawn .card { margin:5px; line-height:normal; }
@@ -293,8 +303,12 @@ x6 2 7 4 8
 
 	bg_brightness.oninput = function() {
 		document.body.style.backgroundColor = `rgba(0,0,0,${100 - (bg_brightness.value)}%)`;
-		document.body.style.color = (bg_brightness.value > 50) ? "black" : "white";
-		console.log(bg_brightness.value, document.body.style.backgroundColor);
+		if (bg_brightness.value < 50) {
+			document.body.classList.add("light-text");			
+		}
+		else {
+			document.body.classList.remove("light-text");
+		}
 	};
 				
 	play_button.onclick = function() {
