@@ -1,0 +1,506 @@
+<!doctype html><html><body tabindex=0>
+<div class="open_mode" id="main">
+	<header>
+		<h1>Stamp</h1>
+		<p><input type="file" id="input_file" accept="image/*" /></p>
+	</header>
+	<p>
+		First, choose a file. Once you've chosen a file,
+		it will be loaded into the main view.
+		In this view, use the following controls and shortcuts to edit.
+	</p>
+	<p>
+		The mouse is a circle, indicating an area to affect or sample.
+		Change the mouse radius by holding <q>ALT</q>.
+		Then move the mouse right to increase size,
+		or left to decrease size.
+		If you are already holding a sample,
+		it will scale as you change the mouse size.
+	</p>
+	<p>
+		There are 2 layers: the original image (which will never change), 
+		and the "drawing" layer on top of it (which can be edited).
+	</p>
+	<p>
+		While you have something to draw with&mdash;a stamp or text&mdash;click
+		to stamp a single copy onto the drawing.
+		Or click and drag to draw a line with what you're holding.
+	</p>
+	<p>
+		Hold <q>E</q> to erase whatever is on the drawing layer
+		within the mouse radius will be erased.
+		(Only works when not using text.)
+	</p>
+	<p>
+		<strong>Sampling</strong>:
+		Hold <q>CTRL</q> and click on a part of the image 
+		to sample what you see.
+		This becomes the stamp you can use to draw with.
+		Hold <q>CTRL + shift</q> and click to sample only the drawn layer.
+	</p>
+	<p>
+		<strong>Colour</strong>:
+		Press <q>C</q> to use the centre of the stamp 
+		(or black if there is no stamp)
+		as the stamp itself.
+		So, if the centre of the sampled area is red,
+		the entire stamp will become red.
+	</p>
+	<p>
+		<strong>Text</strong>:
+		Press <q>T</q>, and type/paste text into the prompt. Click Okay.
+		Now you're holding text to draw with.
+		The colour (as above) is used as the text colour,
+		apart from emoji which use their own colours.
+		Text scales the same way as a normal stamp.
+	</p>
+	<p>
+		<strong>Cancelling</strong>:
+		Use <q>Escape</q> to cancel text.
+		Press again to change the mouse to use the sample's original size.
+		Press again to clear the stamp.
+		Press again to reset the mouse size.
+	</p>
+	<p>
+		Use <q>Q</q> to quit editing mode,
+		to be able to load in a new image.
+	</p>
+</div>
+<div class="play_mode">
+	<div id="blurred"><span>CLICK</span></div>
+	<div id="area">
+		<img id="img" />
+		<canvas id="drawn"></canvas>
+		<canvas id="stamp"></canvas>
+		<canvas id="canvas"></canvas>
+	</div>
+</div>
+<style>
+	#main { max-width:500px; margin:0 auto; }
+	#main header { text-align:center; }
+	#main q { background:#eee; border:1px solid #999; border-radius:3px;
+				   padding:0 2px; font-family:monospace; }
+	#main q::before, #main q::after {content:"";}
+	
+	
+	html, body.play_mode, .play_mode {
+		width:100%; height:100%; margin:0;
+		display:block;
+	}
+	body.play_mode { line-height:0; }
+
+	body.show-alpha, body.drawn_focus {
+		background:url("alpha-checks (1).jpg");
+	}
+	.play_mode { display:none; }
+	body.is-playing .play_mode { display:block; }
+	body.is-playing .open_mode { display:none; }
+
+	
+	body.blur #blurred { display:block;
+		z-index:3; display:block; background:rgba(0,0,0,0.2); color:white;
+		display: flex;
+		justify-content: center;
+		align-items: center;
+		font-size:20vw;
+	}
+	#blurred, #stamp { display:none; }
+
+	#area { position:absolute; margin:auto; }
+	#area * { position:absolute; top:0; left:0; }
+	
+	#blurred {
+		width:100%; height:100%;
+		position:absolute; top:0; left:0;
+	}
+
+	body.drawn_focus img { opacity:0.0; }
+</style>
+
+
+	
+<script>
+
+
+	var playing = false;
+
+	input_file.onchange = function() {
+		if (input_file.files.length === 0) { return; }
+		
+		var FR = new FileReader();
+		FR.onload = function() {
+			load_image(URL.createObjectURL(new Blob([FR.result])));
+		};
+		FR.onerror = function() {
+			input_file.value = "";
+			alert(`Could not load local image "${input_file.files[0].name}".`);
+		};
+		FR.readAsArrayBuffer(input_file.files[0]);
+	};
+
+
+	
+	var ox, oy, wide, scale;
+
+// debugger;
+	drawn.ctx = drawn.getContext("2d");
+	stamp.ctx = stamp.getContext("2d");
+	canvas.ctx = canvas.getContext("2d");
+	
+	function load_image(src) {
+		img.onload = function() {
+			setup_image(img);
+		};
+		img.src = src;
+	}
+	// load_image("English_pattern_playing_cards_deck.svg.png");
+
+	function setup_image(img) {
+		img.ratio = img.height/img.width;
+
+		sr = 0;
+		mr = default_mr;
+
+		stamp.width = stamp.height = 0;
+		drawn.width = canvas.width = img.width;
+		drawn.height = canvas.height = img.height;
+		area.style.width = img.width+"px";
+		area.style.height = img.height+"px";
+		
+		adjust_zoom();
+		// requestAnimationFrame();
+		render_canvas();
+		document.body.classList.add("is-playing");
+		playing = true;
+	}
+
+	function adjust_zoom() {
+		var wide_scale = window.innerWidth / img.width,
+			high_scale = window.innerHeight / img.height;
+
+		if (wide_scale < high_scale) {
+			wide = true;
+			scale = wide_scale;
+			ox = 0;
+			oy = (window.innerHeight - (img.height*scale)) / 2;
+		}
+		else {
+			wide = false;
+			scale = high_scale;
+			ox = (window.innerWidth - (img.width*scale)) / 2;
+			oy = 0;
+		}
+		
+		var body = document.body;
+		area.style.marginLeft = area.style.marginRight =
+			ox/scale + "px";
+		area.style.marginTop = area.style.marginBottom =
+			oy/scale + "px";
+
+		area.style.zoom = scale;
+	}
+
+	var mxo = 0, myo = 0; // old mouse
+	var default_mr = 20;
+	var mx = 0, my = 0, mr = 20, mro; // mouse
+	var cx = 0, cy = 0; // displayed centre
+	var sx = 0, sy = 0, sr = 0; // stamp source
+	window.onmousemove = function(e) {
+		if (!playing) { return; }
+		mxo = mx; myo = my;
+
+		mx = (e.x-ox)/scale|0;
+		my = (e.y-oy)/scale|0;
+
+		// mxo = 0; myo = 0;
+		// mx = 1000; my = 1000;
+		// state = "drawing";
+		// sx = mx; sy = my; sr = 20;
+
+		switch (state) {
+			case "size": 
+				// right+, left-
+				mr = Math.max(mx-cx + mro, 1);
+				return;
+			case "pick-stamp":
+				break;
+			case "erase":
+				erase();
+				break;
+			case "drawing":
+				var gap = 10, gsq=gap*gap;
+				var mdx=mx-mxo, mdy=my-myo;
+				var dsq = mdx*mdx + mdy*mdy;
+				console.log({dsq, gsq});
+
+				drawn.ctx.save();
+				if (text) { text_setup(drawn.ctx); }
+
+				if (dsq > gsq) {
+					var dist = Math.sqrt(dsq);
+					// normalise
+					mdx = mdx / dist; mdy = mdy / dist;
+					// console.log({dist, mdx, mdy, mx, my});
+					for (var i = gap; i < dist; i+=gap) {
+						var x = mxo+mdx*i, y = myo+mdy*i;
+						// if (dsq > 1000) { console.log("stamp", x, y); }
+						console.log("stamp", x,y);
+						if (text) {
+							drawn.ctx.fillText(text, x,y);
+						}
+						else {
+							draw_stamp(drawn.ctx, x,y);
+						}
+					}
+				}
+				if (text) {
+					drawn.ctx.fillText(text, mx,my);
+				}
+				else {
+					draw_stamp(drawn.ctx, mx,my);
+				}
+
+				drawn.ctx.restore();
+				break;
+		}
+
+		cx = mx; cy = my;
+	};
+
+	var allow_mousedown = true;
+	canvas.onmousedown = function(e) {
+		if (!playing) { return; }
+		if (!allow_mousedown) { return; }
+		if (e.button !== 0) { return; }
+		
+		switch (state) {
+			case "pick-stamp":
+				sx = mx; sy = my; sr = mr;
+				stamp.width = sr*2; stamp.height = sr*2;
+				if (!pick_drawn) {
+					// copy board
+					stamp.ctx.drawImage(img,
+						sx-sr,sy-sr, sr*2,sr*2,
+						0,0,         mr*2,mr*2
+					);
+				}
+				// copy drawn
+				stamp.ctx.drawImage(drawn,
+					sx-sr,sy-sr, sr*2,sr*2,
+					0,0,         mr*2,mr*2
+				);
+
+				// pick colour
+				pick_colour();
+				
+				// cut out everything but what was in the circle
+				stamp.ctx.globalCompositeOperation = "destination-in"
+				stamp.ctx.arc(sr,sr, mr, 0,CIRCLE);
+				stamp.ctx.fill();
+				break;
+
+			default:
+				if (text) {
+					drawn.ctx.save();
+					text_setup(drawn.ctx);
+					drawn.ctx.fillText(text, mx,my);
+					drawn.ctx.restore();
+					state = "drawing";
+				}
+				else if (sr > 0) { // there is something to stamp
+					draw_stamp(drawn.ctx, mx,my);
+					state = "drawing";
+				}
+		}
+	}
+	window.onmouseup = function(e) {
+		if (!playing) { return; }
+		if (e.button !== 0) { return; }
+
+		switch(state) {
+			case "drawing": state = "";
+		}
+	}
+
+	var text = "", colour;
+	var colour_mode = false;
+	window.onkeypress = function(e) {
+		if (!playing) { return; }
+		switch (e.key) {
+			case "t":
+				text = prompt("What text would you like to stamp?");
+				mr = default_mr;
+				sr = mr;
+				break;
+			
+			case "c":
+				pick_colour();
+				stamp.width = stamp.height = mr*2;
+				stamp.ctx.arc(sr,sr, mr, 0,CIRCLE);
+				stamp.ctx.fillStyle = colour;
+				stamp.ctx.fill();
+				sr = mr;
+				break;
+
+			case "q":
+				if (confirm("Lose progress and go back to open-file view?")) {
+					state = "";
+					playing = false;
+					input_file.value = "";
+					document.body.classList.remove("is-playing");
+				}
+				break;
+		}
+	}
+
+		
+	var state = "", end_state = "", pick_drawn = false;
+	var esc = false;
+	window.onkeydown = function(e) {
+		if (!playing) { return; }
+		if (end_state === e.key) { return; }
+		
+		switch (e.key) { // Shift Alt Control
+			case "Escape":
+				if (!esc) {
+					if (text) { text = ""; }
+					else if (sr !== 0 && mr != sr) { mr = sr; }
+					else if (sr !== 0) { sr = 0; }
+					else { mr = default_mr; }
+				}
+				esc = true;
+				break;
+			case "Shift":
+				document.body.classList.add("drawn_focus");
+				pick_drawn = true;
+				break;
+			case "Alt": mro = mr;
+				end_state = e.key; state = "size"; break;
+			case "Control":
+				document.body.classList.add("show-alpha");
+				end_state = e.key; state = "pick-stamp"; break;
+			case "e": 
+				if (!text) {
+					erase();
+					document.body.classList.add("drawn_focus");
+					end_state = e.key; state = "erase"; 
+				}
+				break;
+		}
+	};
+	window.onkeyup = function(e) {
+		if (!playing) { return; }
+		if (e.key === end_state) {
+			document.body.classList.remove("drawn_focus");
+			state = ""; end_state = "";
+		}
+		if (state !== "pick-stamp") {
+			document.body.classList.remove("show-alpha");
+		}
+
+		switch(e.key) {
+			case "Alt":
+				cx=mx; cy=my;
+			case "Escape":
+				esc = false;
+				break;
+			case "Shift":
+				document.body.classList.remove("drawn_focus");
+				pick_drawn = false;
+				break;
+		}
+		
+		// switch(e.key) {
+		// 	case "Alt":  break;
+		// }
+	};
+
+	var CIRCLE = Math.PI * 2;
+	function render_canvas() {
+		document.title = `${mx} ${my} ${state} ${mr}`;
+		
+		canvas.ctx.clearRect(0,0, canvas.width,canvas.height);
+
+
+		if (text) {
+			// render text
+			drawn.ctx.save();
+			text_setup(canvas.ctx);
+			canvas.ctx.fillText(text, cx,cy);
+			canvas.ctx.restore();
+		}
+		else {
+			switch(state) {
+				case "erase": case "pick-stamp":
+				case "drawing":
+					break;
+				default:
+					if (sr > 0) { // stamp ready
+						canvas.ctx.save();
+						canvas.ctx.globalAlpha = 0.5;
+						draw_stamp(canvas.ctx, cx,cy);
+						canvas.ctx.restore();
+					}
+			}
+	
+			// draw mouse outline
+			canvas.ctx.save();
+			canvas.ctx.beginPath();
+			canvas.ctx.arc(cx,cy, mr, 0,CIRCLE);
+			canvas.ctx.lineWidth = 4;
+			canvas.ctx.strokeStyle = "white";
+			canvas.ctx.stroke();
+			canvas.ctx.lineWidth = 2;
+			canvas.ctx.strokeStyle = "black";
+			canvas.ctx.stroke();
+			canvas.ctx.restore();
+		}
+		
+		requestAnimationFrame(render_canvas);
+	}
+
+	function pick_colour() {
+		var px = stamp.ctx.getImageData(sr|0,sr|0, 1,1).data;
+		colour = `rgb(${px[0]},${px[1]},${px[2]})`;
+	}
+
+	function text_setup(ctx) {
+		ctx.font = (1.5 * mr) + "px Arial";
+		ctx.textAlign = "center";
+		ctx.textBaseline = "middle";
+		ctx.fillStyle = colour;
+	}
+
+	function draw_stamp(ctx, x,y) {
+		ctx.drawImage(stamp,
+			0,0,       sr*2,sr*2,
+			x-mr,y-mr, mr*2,mr*2);
+	}
+
+	function erase() {
+		drawn.ctx.save();
+		drawn.ctx.globalCompositeOperation = "destination-out";
+		drawn.ctx.beginPath();
+		drawn.ctx.moveTo(mxo,myo);
+		drawn.ctx.lineTo(mx,my);
+		drawn.ctx.lineCap = "round";
+		drawn.ctx.lineWidth = mr*2;
+		drawn.ctx.stroke();
+		drawn.ctx.restore();
+	}
+
+
+	window.addEventListener('focus', function() {
+		if (!playing) { return; }
+		setTimeout(function() { allow_mousedown = true; }, 1);
+		document.body.classList.remove('blur');
+	});
+	
+	window.addEventListener('blur', function() {
+		if (!playing) { return; }
+		allow_mousedown = false;
+		document.body.classList.add('blur');
+	});
+
+</script>
+</body></html>
