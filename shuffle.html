@@ -1,5 +1,16 @@
 <!doctype html>
 <style type="text/css">
+	#status_display { 
+		display:none;
+		background:#eee; border:solid #999;
+		border-width:1px 1px 0 0;
+		border-top-right-radius:5px;
+		padding:5px 7px;
+		font-family:monospace;
+		position:fixed; bottom:0; left:0;
+	}
+	#status_display.shown { display:block; }
+	
 	body { text-align:center; }
 	.card { display:inline-block; text-align:center; width:150px; height:200px; }
 	.card.text { box-shadow:0 0 1px black; }
@@ -13,7 +24,7 @@
 
 	#explanation { text-align:left; line-height:140%; max-width:500px; margin:0 auto; }
 	#explanation q { background:#eee; border:1px solid #999; border-radius:3px;
-				   padding:0 2px; font-family:sans-serif; font-size:90%; }
+				   padding:0 2px; font-family:monospace; }
 	#explanation q::before, #explanation q::after {content:"";}
 		
 	.info { margin:1em auto; font-size:20px; white-space:break-spaces;
@@ -23,7 +34,7 @@
 		  }
 	.info:focus { outline-width:1px; }
 
-	.row { display:flex; }
+	.row { display:flex; margin:0.5em 0; }
 	.row .deck, .row .info { flex:1; margin:0; }
 
 	#src_input { outline:0; border:0.5em solid white; box-shadow:0 0 0 1px black; 
@@ -31,13 +42,12 @@
 			   }
 	
 	#drawn { line-height:0; margin:1em; }
-	#drawn .card { margin:5px; line-height:normal; }
+	#drawn .card {  line-height:normal; }
 	#drawn .card.text { position:relative; background-color:white; color:black; }
 	#drawn .card.text .content { position:absolute; top:50%; transform:translateY(-50%); left:5px; right:5px; max-height:100%; pointer-events:none; }
 
 	.deck + .deck, .deck + .info { margin-left:1em; }
-	.deck #actions { width:100%; overflow-x:auto; white-space:nowrap; }
-	
+
 	#shuffled { display:none; zoom:0.5; }
 	#discarded { display:none; zoom:0.5; }
 
@@ -56,24 +66,42 @@
 	body.edited .from_edit { display:initial; }
 	
 	.deck { outline:0; }
-	.deck:focus h1, .deck:has(button:focus) h1
-		{ text-decoration:underline; }
-	
+	.deck header { border-bottom:1px solid transparent; padding:4px 4px 3px 4px; }
+	.deck header br { clear:both; }
+	#name_display {
+		float:left; display:inline; font-size:100%; margin-right:10px; 
+/* 		padding:5px 0 0 5px; */
+	}
+	.deck:focus header, .deck:has(button:focus) header
+		{ border-bottom-color:black; background-color:#eee; }
+	body.dark .deck:focus header, body.dark .deck:has(button:focus) header
+		{ border-bottom-color:white; background-color:#333; }
+
+
+		.deck #actions { overflow-x:auto; white-space:nowrap; }
+
+	#actions { float:right; display:inline-block; }
+	#actions button { line-height:16px; }
+
 </style>
 
-<div id="prototype">
-	<span class="card"></span>
-	<div class="deck" tabindex="0">
-		<h1 id="name_display"></h1>
-		<div id="status_display"></div>
+<div id="status_display">Test</div>
 
-		<div id="actions">
-			<button id="draw_button" title="Draw 1 card. Press 1-9 to draw that many cards.">Draw</button>
-			<button id="draw_all_button">Draw All</button>
-			<button id="roll_button" title="Shuffle all & draw 1 card">Roll</button>
-			<button id="discard_button" title="Discard all drawn cards. Press 0.">Discard</button>
-			<button id="shuffle_button" title="Shuffles all drawn and discards into the deck. Press S.">Shuffle</button>
-		</div>
+<div id="prototype">
+	<span class="card" title="Click to discard"></span>
+	<div class="deck" tabindex="0">
+		<header>
+			<h1 id="name_display"></h1>
+			<div id="actions">
+				<button id="draw_button" title="Draw 1 card. Press 1-9 to draw that many cards.">🎴</button>
+				<button id="draw_all_button" title="Draw All">♾️</button>
+				<button id="roll_button" title="Shuffle all &amp; draw 1 card. Press R.">🎲</button>
+				<button id="discard_button" title="Discard all drawn cards. Press 0.">🗑️</button>
+				<button id="undiscard_button" title="Undiscard, draws the last-discarded card.">⬅</button>
+				<button id="shuffle_button" title="Shuffles all drawn and discards into the deck. Press S.">🔀</button>
+			</div>
+			<br/>
+		</header>
 			
 		<div id="drawn"></div>
 	
@@ -97,7 +125,11 @@
 	<div id="decks_shown"></div>
 </div>
 <div class="edit_mode">
-	<textarea id="src_input" rows=10 cols=50></textarea>
+	<textarea id="src_input" rows=10 cols=50>
+# sdfsdfgg
+2x sdjfk
+state: ?|0|-
+	</textarea>
 	<br/>
 	<span class="fresh"><button id="play_button">Play</button></span>
 	<span class="from_edit">
@@ -168,10 +200,26 @@ x6 2 7 4 8
 
 <style id="card_style" type="text/css"></style>
 <script>
+	var CARD_MARGIN = 5;
+	
 	var prototype = document.getElementById("prototype");
 	prototype.parentNode.removeChild(prototype);
 	prototype.id = "";
 
+	Object.defineProperty(status_display, "value", {
+		set: function(v) {
+			console.log(v);
+			if (v) {
+				status_display.innerText = v;
+				status_display.classList.add("shown");
+			}
+			else {
+				status_display.innerText = "";
+				status_display.classList.remove("shown");
+			}
+		}
+	});
+	
 	function to_number(str) { return +str; }
 	var find_integers = /\d+/g;
 	
@@ -274,31 +322,39 @@ x6 2 7 4 8
 			}
 			else {
 				return (
-`#${deck.side ? "<" : ""} ${deck.name}${
-	deck.local ? "\nlocal: "+deck.local
-	: deck.img_url ? "\n" + deck.img_url
-	: ""
-}${
-	deck.grid ? "\ngrid: " + deck.grid
-		: deck.px ? "\npx: " + deck.px
-		: ""
-}${
-	deck.zoom !== 1 ? "\nzoom: " + deck.zoom : ""
-}${
-	(deck.margin.x || deck.margin.y)
-		? "\nmargin: " + (
-			deck.margin.x === deck.margin.y
-				? deck.margin.x
-				: deck.margin.x + " " + deck.margin.y
-		)
-		: ""
-}${
-	deck.quantities ? "\nx" + deck.quantities.join(" ") : "" 
-}${
-	deck.text_cards ? regen_text_cards(deck.text_cards) : ""
-}${
-	generate_state(deck.shown)
-}`
+					"#" + (deck.side ? "<" : "") + " " +
+					(deck.name) +
+					(
+						deck.local ? "\nlocal: "+deck.local
+						: deck.img_url ? "\n" + deck.img_url
+						: ""
+					) +
+					(
+						deck.grid ? "\ngrid: " + deck.grid
+							: deck.px ? "\npx: " + deck.px
+							: ""
+					) +
+					(
+						deck.zoom !== 1 ? "\nzoom: " + deck.zoom : ""
+					) +
+					(
+						(deck.margin.x || deck.margin.y)
+							? "\nmargin: " + (
+								deck.margin.x === deck.margin.y
+									? deck.margin.x
+									: deck.margin.x + " " + deck.margin.y
+							)
+							: ""
+					) +
+					(
+						deck.quantities ? "\nx" + deck.quantities.join(" ") : "" 
+					) +
+					(
+						deck.text_cards ? regen_text_cards(deck.text_cards) : ""
+					) +
+					(
+						generate_state(deck.shown)
+					)
 				);
 			}
 		}).join("\n\n");
@@ -495,6 +551,7 @@ x6 2 7 4 8
 		
 		var p = prototype.cloneNode(true);
 		var card = deck.card_prototype = p.children[0];
+		card.style.margin = CARD_MARGIN + "px";
 		var deck_shown = deck.deck_shown = p.children[1];
 		deck.shown = deck_shown;
 
@@ -510,11 +567,11 @@ x6 2 7 4 8
 			deck_shown.querySelector("#discarded");
 		var discarded_cards = discarded.childNodes;
 
-
 		deck_shown.draw_button = deck_shown.querySelector("#draw_button");
 		deck_shown.draw_all_button = deck_shown.querySelector("#draw_all_button");
 		deck_shown.roll_button = deck_shown.querySelector("#roll_button");
 		deck_shown.discard_button = deck_shown.querySelector("#discard_button");
+		deck_shown.undiscard_button = deck_shown.querySelector("#undiscard_button");
 		deck_shown.shuffle_button = deck_shown.querySelector("#shuffle_button");
 	
 		deck_shown.status_display = deck_shown.querySelector("#status_display");
@@ -564,7 +621,7 @@ x6 2 7 4 8
 			card.style.backgroundImage = `url("${deck.img_url}")`;
 		}
 		
-		deck_shown.drawn.style.minHeight = (deck.cheight * deck.zoom) + "px";
+		deck_shown.drawn.style.minHeight = ((deck.cheight * deck.zoom) + (CARD_MARGIN * 2)) + "px";
 
 	
 		// add cards to shuffled deck
@@ -668,19 +725,44 @@ x6 2 7 4 8
 			}
 		}
 
-	
+
+		deck_shown.addEventListener("mouseover", function(e) {
+			e.preventDefault();
+			e.stopPropagation();
+
+			switch (e.target.id) {
+				case "draw_button":
+				case "draw_all_button":
+				case "roll_button":
+					status_display.value = deck_shown.shuffled.childNodes.length + " card(s) to draw";
+					break;
+				case "discard_button":
+					status_display.value = deck_shown.drawn.childNodes.length + " card(s) currently drawn";
+					break;
+				case "shuffle_button":
+					status_display.value = deck_shown.discarded.childNodes.length + " card(s) to shuffle back into the deck";
+					break;
+			}
+		}, true);
+
+		deck_shown.addEventListener("mouseout", function(e) {
+			e.preventDefault();
+			e.stopPropagation();
+			status_display.value = "";
+		});
+		
 		// click handler
 		deck_shown.addEventListener("click", function(e) {
 			e.preventDefault();
 			e.stopPropagation();
 
-			// deck_shown.focus();
+			deck_shown.focus();
 
 			if (e.target.classList.contains("card")) {
 				discarded.prepend(e.target);
 			}
 			else { // buttons
-				switch(e.target.id) {
+				switch (e.target.id) {
 					case "draw_button":
 						drawn.appendChild(shuffled_cards[shuffled_cards.length * Math.random() | 0]);
 						break;
@@ -696,6 +778,12 @@ x6 2 7 4 8
 
 					case "discard_button":
 						move_all(drawn, discarded);
+						break;
+
+					case "undiscard_button":
+						deck_shown.drawn.appendChild(
+							deck_shown.discarded.lastElementChild
+						);
 						break;
 					
 					case "shuffle_button":
@@ -763,15 +851,13 @@ x6 2 7 4 8
 		
 		deck_shown.discard_button.disabled = 
 			(deck_shown.drawn.childNodes.length === 0);
-
+		
+		deck_shown.undiscard_button.disabled = 
+			(deck_shown.discarded.childNodes.length === 0);
+		
 		deck_shown.shuffle_button.disabled = 
 			(deck_shown.drawn.childNodes.length === 0
 			&& deck_shown.discarded.childNodes.length === 0);
-
-		deck_shown.status_display.innerText =
-			`${deck_shown.shuffled.childNodes.length} shuffled | ${
-				deck_shown.drawn.childNodes.length} drawn | ${
-				deck_shown.discarded.childNodes.length} discarded`;
 	}
 	
 </script>
