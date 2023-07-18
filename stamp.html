@@ -1,4 +1,6 @@
-<!doctype html><html><body tabindex=0>
+<!doctype html><html>
+<title>Stamp | draw on boards for roll n' write games</title>
+<body tabindex=0>
 <div class="open_mode" id="main">
 	<header>
 		<h1>Stamp</h1>
@@ -9,6 +11,13 @@
 		it will be loaded into the main view.
 		In this view, use the following controls and shortcuts to edit.
 	</p>
+	<blockquote><em>
+		Note, the controls will not work properly
+		if the page is not the focus.
+		While the page is not the focus a "click"
+		overlay will show. Click it to focus on the page,
+		and resume using the controls.
+	</em></blockquote>
 	<p>
 		The mouse is a circle, indicating an area to affect or sample.
 		Change the mouse radius by holding <q>ALT</q>.
@@ -52,15 +61,20 @@
 		Now you're holding text to draw with.
 		The colour (as above) is used as the text colour,
 		apart from emoji which use their own colours.
+		(So to change colour, simply sample as normal.)
 		Text scales the same way as a normal stamp.
 	</p>
 	<p>
 		<strong>Cancelling</strong>:
-		Use <q>Escape</q> to cancel text.
-		Press again to change the mouse to use the sample's original size.
-		Press again to clear the stamp.
-		Press again to reset the mouse size.
+		Use <q>Escape</q> to reset the cursor; 
+		it will do the first of the following that it can:
 	</p>
+	<ul>
+		<li>Cancel text and reset stamp.</li>
+		<li>Change the mouse to use the sample's original size.</li>
+		<li>Clear the stamp.</li>
+		<li>Reset the mouse size.</li>
+	</ul>
 	<p>
 		Use <q>Q</q> to quit editing mode,
 		to be able to load in a new image.
@@ -76,12 +90,16 @@
 	</div>
 </div>
 <style>
+	body { margin:0; }
+	* { user-select: none; }
+
 	#main { max-width:500px; margin:0 auto; }
 	#main header { text-align:center; }
 	#main q { background:#eee; border:1px solid #999; border-radius:3px;
 				   padding:0 2px; font-family:monospace; }
-	#main q::before, #main q::after {content:"";}
-	
+	#main q::before, #main q::after { content:""; }
+
+	#canvas { cursor:none; }
 	
 	html, body.play_mode, .play_mode {
 		width:100%; height:100%; margin:0;
@@ -120,8 +138,8 @@
 
 	
 <script>
-
-
+	var test;
+	test = "settlers-board.png";
 	var playing = false;
 
 	input_file.onchange = function() {
@@ -172,6 +190,8 @@
 		render_canvas();
 		document.body.classList.add("is-playing");
 		playing = true;
+
+		console.log("setup end", {mx,my})
 	}
 
 	function adjust_zoom() {
@@ -190,6 +210,8 @@
 			ox = (window.innerWidth - (img.width*scale)) / 2;
 			oy = 0;
 		}
+
+		document.title = `${ox} ${oy}`;
 		
 		var body = document.body;
 		area.style.marginLeft = area.style.marginRight =
@@ -206,12 +228,14 @@
 	var cx = 0, cy = 0; // displayed centre
 	var sx = 0, sy = 0, sr = 0; // stamp source
 	window.onmousemove = function(e) {
-		if (!playing) { return; }
 		mxo = mx; myo = my;
 
+		// problem: can't find mouse before setup.
 		mx = (e.x-ox)/scale|0;
 		my = (e.y-oy)/scale|0;
 
+		if (!playing) { return; }
+		
 		// mxo = 0; myo = 0;
 		// mx = 1000; my = 1000;
 		// state = "drawing";
@@ -234,7 +258,7 @@
 				console.log({dsq, gsq});
 
 				drawn.ctx.save();
-				if (text) { text_setup(drawn.ctx); }
+				if (has_text) { text_setup(drawn.ctx); }
 
 				if (dsq > gsq) {
 					var dist = Math.sqrt(dsq);
@@ -245,16 +269,16 @@
 						var x = mxo+mdx*i, y = myo+mdy*i;
 						// if (dsq > 1000) { console.log("stamp", x, y); }
 						console.log("stamp", x,y);
-						if (text) {
-							drawn.ctx.fillText(text, x,y);
+						if (has_text) {
+							draw_text(drawn.ctx, x,y);
 						}
 						else {
 							draw_stamp(drawn.ctx, x,y);
 						}
 					}
 				}
-				if (text) {
-					drawn.ctx.fillText(text, mx,my);
+				if (has_text) {
+					draw_text(drawn.ctx, mx,my);
 				}
 				else {
 					draw_stamp(drawn.ctx, mx,my);
@@ -300,10 +324,10 @@
 				break;
 
 			default:
-				if (text) {
+				if (has_text) {
 					drawn.ctx.save();
 					text_setup(drawn.ctx);
-					drawn.ctx.fillText(text, mx,my);
+					draw_text(drawn.ctx, mx,my);
 					drawn.ctx.restore();
 					state = "drawing";
 				}
@@ -322,13 +346,20 @@
 		}
 	}
 
-	var text = "", colour;
-	var colour_mode = false;
+	var has_text = false, text = "", texts;
+	var text_height = 1.5;
+	var colour_mode = false, colour;
 	window.onkeypress = function(e) {
 		if (!playing) { return; }
 		switch (e.key) {
 			case "t":
+				texts = null;
 				text = prompt("What text would you like to stamp?");
+				if (text) {
+					has_text = true;
+					if (text.indexOf("\\n") !== -1) { texts = text.split("\\n"); }
+				}
+				
 				mr = default_mr;
 				sr = mr;
 				break;
@@ -363,7 +394,7 @@
 		switch (e.key) { // Shift Alt Control
 			case "Escape":
 				if (!esc) {
-					if (text) { text = ""; }
+					if (has_text) { has_text = false; }
 					else if (sr !== 0 && mr != sr) { mr = sr; }
 					else if (sr !== 0) { sr = 0; }
 					else { mr = default_mr; }
@@ -417,16 +448,16 @@
 
 	var CIRCLE = Math.PI * 2;
 	function render_canvas() {
-		document.title = `${mx} ${my} ${state} ${mr}`;
+		// document.title = `${mx} ${my} ${state} ${mr}`;
 		
 		canvas.ctx.clearRect(0,0, canvas.width,canvas.height);
 
 
-		if (text) {
+		if (has_text) {
 			// render text
 			drawn.ctx.save();
 			text_setup(canvas.ctx);
-			canvas.ctx.fillText(text, cx,cy);
+			draw_text(canvas.ctx, cx,cy);
 			canvas.ctx.restore();
 		}
 		else {
@@ -472,9 +503,23 @@
 	}
 
 	function draw_stamp(ctx, x,y) {
+		if (sr === 0) { return; }
+		
 		ctx.drawImage(stamp,
 			0,0,       sr*2,sr*2,
 			x-mr,y-mr, mr*2,mr*2);
+	}
+	function draw_text(ctx, x,y) {
+		if (!texts) {
+			ctx.fillText(text, x,y);
+		}
+		else {
+			var line_height = text_height * mr;
+			var oy = -(texts.length * line_height) / 2;
+			for (var i = 0; i < texts.length; i++) {
+				ctx.fillText(texts[i], x, y - oy + line_height*i);
+			}
+		}		
 	}
 
 	function erase() {
@@ -492,15 +537,18 @@
 
 	window.addEventListener('focus', function() {
 		if (!playing) { return; }
-		setTimeout(function() { allow_mousedown = true; }, 1);
+		setTimeout(function() { allow_mousedown = true; }, 100);
 		document.body.classList.remove('blur');
 	});
 	
 	window.addEventListener('blur', function() {
 		if (!playing) { return; }
+		state = "";
 		allow_mousedown = false;
 		document.body.classList.add('blur');
 	});
 
+
+	if (test) { load_image(test); }
 </script>
 </body></html>
