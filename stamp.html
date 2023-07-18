@@ -4,11 +4,22 @@
 <div class="open_mode" id="main">
 	<header>
 		<h1>Stamp</h1>
+		<p>
+			<input id="load_url" placeholder="Web address" />
+			<button onclick="load_image(false, load_url.value)">Load from Web</button>
+		</p>
 		<p><input type="file" id="input_file" accept="image/*" /></p>
 	</header>
 	<p>
-		First, choose a file. Once you've chosen a file,
-		it will be loaded into the main view.
+		Put a web address into the box and click load, or choose a file.
+		The image will then be loaded into the main view.
+	</p>
+	<blockquote>
+		Alternatively, if the address of the page 
+		has a <q>?load=</q> parameter, that will be used 
+		to automatically load an image.
+	</blockquote>
+	<p>
 		In this view, use the following controls and shortcuts to edit.
 	</p>
 	<blockquote><em>
@@ -65,6 +76,17 @@
 		Text scales the same way as a normal stamp.
 	</p>
 	<p>
+		Use <q>\n</q> in the text to mark a new line.
+		For example, <q>TOWN\nHOUSE</q> will print text like this:
+		<pre style="margin-left:1em;">TOWN
+HOUSE</pre>
+	</p>
+	<p>
+		Begin text with <q>=</q> to perform arithmetic,
+		and use the result as a stamp. 
+		For example, to add up your final score.		
+	</p>
+	<p>
 		<strong>Cancelling</strong>:
 		Use <q>Escape</q> to reset the cursor; 
 		it will do the first of the following that it can:
@@ -91,7 +113,7 @@
 </div>
 <style>
 	body { margin:0; }
-	* { user-select: none; }
+	.play_mode * { user-select: none; }
 
 	#main { max-width:500px; margin:0 auto; }
 	#main header { text-align:center; }
@@ -129,7 +151,7 @@
 	
 	#blurred {
 		width:100%; height:100%;
-		position:absolute; top:0; left:0;
+		position:fixed; top:0; left:0;
 	}
 
 	body.drawn_focus img { opacity:0.0; }
@@ -138,8 +160,6 @@
 
 	
 <script>
-	var test;
-	test = "settlers-board.png";
 	var playing = false;
 
 	input_file.onchange = function() {
@@ -147,7 +167,7 @@
 		
 		var FR = new FileReader();
 		FR.onload = function() {
-			load_image(URL.createObjectURL(new Blob([FR.result])));
+			load_image(true, URL.createObjectURL(new Blob([FR.result])));
 		};
 		FR.onerror = function() {
 			input_file.value = "";
@@ -165,9 +185,29 @@
 	stamp.ctx = stamp.getContext("2d");
 	canvas.ctx = canvas.getContext("2d");
 	
-	function load_image(src) {
+	function load_image(from_file, src) {
 		img.onload = function() {
+			stamp.width = stamp.height = 1;
+			stamp.ctx.drawImage(img, 0,0);
+			try { stamp.ctx.getImageData(0,0,1,1); }
+			catch(e) {
+				if (!confirm("\
+Cannot read colours from image, \
+so some features will only use black as the colour. \
+Proceed?"
+					)) {
+						return;
+					}
+			}
+
+			if (!from_file) {
+				history.pushState(null, "", location.origin+location.pathname+"?load="+src);
+			}
+			
 			setup_image(img);
+		};
+		img.onerror = function(e) {
+			alert(`Could not load image "${src}".`);
 		};
 		img.src = src;
 	}
@@ -190,8 +230,6 @@
 		render_canvas();
 		document.body.classList.add("is-playing");
 		playing = true;
-
-		console.log("setup end", {mx,my})
 	}
 
 	function adjust_zoom() {
@@ -211,7 +249,7 @@
 			oy = 0;
 		}
 
-		document.title = `${ox} ${oy}`;
+		// document.title = `${ox} ${oy}`;
 		
 		var body = document.body;
 		area.style.marginLeft = area.style.marginRight =
@@ -255,7 +293,6 @@
 				var gap = 10, gsq=gap*gap;
 				var mdx=mx-mxo, mdy=my-myo;
 				var dsq = mdx*mdx + mdy*mdy;
-				console.log({dsq, gsq});
 
 				drawn.ctx.save();
 				if (has_text) { text_setup(drawn.ctx); }
@@ -264,11 +301,8 @@
 					var dist = Math.sqrt(dsq);
 					// normalise
 					mdx = mdx / dist; mdy = mdy / dist;
-					// console.log({dist, mdx, mdy, mx, my});
 					for (var i = gap; i < dist; i+=gap) {
 						var x = mxo+mdx*i, y = myo+mdy*i;
-						// if (dsq > 1000) { console.log("stamp", x, y); }
-						console.log("stamp", x,y);
 						if (has_text) {
 							draw_text(drawn.ctx, x,y);
 						}
@@ -357,7 +391,22 @@
 				text = prompt("What text would you like to stamp?");
 				if (text) {
 					has_text = true;
-					if (text.indexOf("\\n") !== -1) { texts = text.split("\\n"); }
+					
+					if (/^=(?:\d+(?:\.\d+)?|[-+*\/ \t])+$/.test(text)) {
+						// a simple arithmetic expression (no brackets)
+						try {
+							text = new Function("return " + text.slice(1))()
+								.toString();
+						} catch(e) { }
+					}
+					
+					if (text.indexOf("\\n") !== -1) {
+						// multi-line
+						texts = text.split("\\n");
+					}
+					else {
+						// normal text
+					}
 				}
 				
 				mr = default_mr;
@@ -394,7 +443,7 @@
 		switch (e.key) { // Shift Alt Control
 			case "Escape":
 				if (!esc) {
-					if (has_text) { has_text = false; }
+					if (has_text) { has_text = false; sr = 0; mr = default_mr; }
 					else if (sr !== 0 && mr != sr) { mr = sr; }
 					else if (sr !== 0) { sr = 0; }
 					else { mr = default_mr; }
@@ -491,8 +540,11 @@
 	}
 
 	function pick_colour() {
-		var px = stamp.ctx.getImageData(sr|0,sr|0, 1,1).data;
-		colour = `rgb(${px[0]},${px[1]},${px[2]})`;
+		try {
+			var px = stamp.ctx.getImageData(sr|0,sr|0, 1,1).data;
+			colour = `rgb(${px[0]},${px[1]},${px[2]})`;
+		}
+		catch(e) { colour = "black"; }
 	}
 
 	function text_setup(ctx) {
@@ -519,7 +571,7 @@
 			for (var i = 0; i < texts.length; i++) {
 				ctx.fillText(texts[i], x, y - oy + line_height*i);
 			}
-		}		
+		}
 	}
 
 	function erase() {
@@ -549,6 +601,8 @@
 	});
 
 
-	if (test) { load_image(test); }
+	location.search.replace(/[&?]load=([^&]+)/, function(m, load) {
+		load_image(false, load);
+	});
 </script>
 </body></html>
