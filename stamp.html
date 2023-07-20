@@ -439,8 +439,9 @@ Proceed?"
 	window.onkeydown = function(e) {
 		if (!playing) { return; }
 		if (end_state === e.key) { return; }
-		
-		switch (e.key) { // Shift Alt Control
+
+		var handled = true;
+		switch (e.key) {
 			case "Escape":
 				if (!esc) {
 					if (has_text) { has_text = false; sr = 0; mr = default_mr; }
@@ -466,7 +467,11 @@ Proceed?"
 					end_state = e.key; state = "erase"; 
 				}
 				break;
+
+			default: handled = false;
 		}
+
+		if (handled) { e.preventDefault(); }
 	};
 	window.onkeyup = function(e) {
 		if (!playing) { return; }
