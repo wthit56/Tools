@@ -290,7 +290,8 @@ Proceed?"
 				erase();
 				break;
 			case "drawing":
-				var gap = 10, gsq=gap*gap;
+				var gap = Math.min(mr*2/3, 10), gsq=gap*gap;
+				console.log(gap);
 				var mdx=mx-mxo, mdy=my-myo;
 				var dsq = mdx*mdx + mdy*mdy;
 
@@ -382,7 +383,7 @@ Proceed?"
 
 	var has_text = false, text = "", texts;
 	var text_height = 1.5;
-	var colour_mode = false, colour;
+	var colour;
 	window.onkeypress = function(e) {
 		if (!playing) { return; }
 		switch (e.key) {
@@ -461,7 +462,7 @@ Proceed?"
 				document.body.classList.add("show-alpha");
 				end_state = e.key; state = "pick-stamp"; break;
 			case "e": 
-				if (!text) {
+				if (!has_text) {
 					erase();
 					document.body.classList.add("drawn_focus");
 					end_state = e.key; state = "erase"; 
