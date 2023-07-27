@@ -41,13 +41,13 @@
 	.row .deck, .row .info { flex:1; margin:0; }
 
 	#src_input { outline:0; border:0.5em solid white; box-shadow:0 0 0 1px black; 
-				margin:1px; white-space:nowrap;
-			   }
+		margin:1px; white-space:nowrap;
+	}
 	
 	#drawn { line-height:0; margin:1em; }
 	#drawn .card {  line-height:normal; }
 	#drawn .card.text { position:relative; background-color:white; color:black; }
-	#drawn .card.text .content { position:absolute; top:50%; transform:translateY(-50%); left:5px; right:5px; max-height:100%; pointer-events:none; }
+	#drawn .card.text > .content { position:absolute; top:50%; transform:translateY(-50%); left:5px; right:5px; max-height:100%; pointer-events:none; }
 
 	.deck + .deck, .deck + .info { margin-left:1em; }
 
@@ -87,6 +87,7 @@
 	#actions button { line-height:16px; }
 
 </style>
+<style id="card_styles_css"></style>
 
 <div id="status_display">Test</div>
 
@@ -203,11 +204,11 @@ x6 2 7 4 8
 	
 	var prototype = document.getElementById("prototype");
 	prototype.parentNode.removeChild(prototype);
+	
 	prototype.id = "";
 
 	Object.defineProperty(status_display, "value", {
 		set: function(v) {
-			console.log(v);
 			if (v) {
 				status_display.innerText = v;
 				status_display.classList.add("shown");
@@ -301,13 +302,19 @@ x6 2 7 4 8
 
 	function regen_text_cards(cards) {
 		var f = undefined;
+		var s = -1;
 		var out = "";
 		for (var i = 0; i < cards.length; i++) {
-			if (f != cards[i].font) {
-				f = cards[i].font;
+			var c = cards[i];
+			if (f != c.font) {
+				f = c.font;
 				out += "\nfont:" + f;
 			}
-			out += `\n${cards[i].quantity}x ${cards[i].content}`
+			if (c.style_id !== -1 && s != c.style_id) {
+				s = c.style_id;
+				out += "\n" + card_styles[c.style_id];
+			}
+			out += `\n${c.quantity}x ${c.content}`
 		}
 		return out;
 	}
@@ -364,7 +371,6 @@ x6 2 7 4 8
 	bg_brightness.oninput = function() {
 		var b = bg_brightness.value / 100;
 		var h = b * 255;
-		console.log(b);
 		document.body.style.backgroundColor = `rgb(${h},${h},${h})`;
 		if (b < 0.5) { document.body.classList.add("dark"); }
 		else {         document.body.classList.remove("dark"); }
@@ -398,7 +404,9 @@ x6 2 7 4 8
 				local_images_by_name[local_images.files[i].name] = local_images.files[i];
 			}
 		}
-		
+
+		card_styles.use = false;
+		card_styles.length = 0;
 		src_input.value.replace(scan_src, parse_src);
 		if (decks.length === 0) { error("Found no decks."); }
 		if (errors.report()) { return; }
@@ -447,6 +455,9 @@ x6 2 7 4 8
 		).then(function then() {
 			decks.forEach(setup_deck);
 			if (errors.report()) { return; }
+
+			console.log(card_styles);
+			card_styles.setup();
 			
 			show_src(false);
 		}, function do_catch() {
@@ -456,13 +467,39 @@ x6 2 7 4 8
 
 	var loading_images;
 	var loading_promises = [];
+
+	var card_styles = [];
+	card_styles.use = false;
+	card_styles.setup = function() {
+		var css = "";
+		for (var i = 0; i < card_styles.length; i++) {
+			var s = ` .deck #drawn .card[data-style="${i}"] `;
+			var styles = card_styles[i].replace(/(.*?)(\{[^}]*\})/g, function(m,
+				selector, style
+			) {
+				return (
+					selector.replace(/\$(?=\s+[^\{])/g, s + " .content ")
+						.replace(/\$(?=[\s\{])/g, s) +
+					style +
+					"\n"
+				);
+			});
+			console.log(card_styles[i],"->",styles);
+			css += styles;
+
+			// console.log(deck.name+":", styles);
+		}
+		card_styles_css.innerHTML = css;
+		console.log(css);
+	}
 	
-	var scan_src = /^\#(<)?[ \t]*(\S.*)$|^x((?:\d+[ \t]*)+)$|^((?:file|https?):.+)$|^(\d+)x[ \t]+(.+)$|^\.(<)?[ \t]*(.+)$|^(\w+):[ \t]*(.+)$/gm;
+	var scan_src = /^\#(<)?[ \t]*(\S.*)$|^x((?:\d+[ \t]*)+)$|^((?:file|https?):.+)$|^(\d+)x[ \t]+(.+)$|^\.(<)?[ \t]*(.+)$|^(\$.*)$|^(\w+):[ \t]*(.+)$/gm;
 	function parse_src(m,
 		deck_side, name,
 		quantities, url,
 		text_quantity, text,
 		info_side, info,
+		styles,
 		key, value
 	) {
 		if (errors.length > 0) { return; }
@@ -478,6 +515,9 @@ x6 2 7 4 8
 			}
 			decks.push(deck = { name: name });
 			deck.side = deck_side;
+			// subsequent text cards shouldn't use a style
+			// until a new style is defined within this deck
+			card_styles.use = false;
 		}
 		else if (info) {
 			decks.push(deck = { info: info });
@@ -496,12 +536,22 @@ x6 2 7 4 8
 				var q = parseInt(text_quantity);
 				if (text) {
 					if (!deck.text_cards) { deck.text_cards = []; }
-					deck.text_cards.push({ quantity:q, font:deck.font, content:text });
+					var sid = card_styles.use ? card_styles.length - 1 : -1;
+					deck.text_cards.push({
+						quantity:q, font:deck.font,
+						style_id: sid,
+						content:text
+					});
 				}
 				else {
 					error(`Text card has no content.`);
 					return;
 				}
+			}
+			else if (styles) {
+				card_styles.use = true;
+				console.log(deck.name+":", styles);
+				card_styles.push(styles);
 			}
 			else if (key) {
 				deck[key] = value;
@@ -510,7 +560,10 @@ x6 2 7 4 8
 	}
 
 
+	var last_id = 0;
 	function setup_deck(deck) {
+		var id = "deck_" + (last_id++);
+		
 		if (!deck.side) {
 			decks_row = decks_shown.appendChild(document.createElement("div"));
 			decks_row.className = "row";
@@ -553,6 +606,7 @@ x6 2 7 4 8
 		card.style.margin = CARD_MARGIN + "px";
 		var deck_shown = deck.deck_shown = p.children[1];
 		deck.shown = deck_shown;
+		deck_shown.id = id;
 
 		var shuffled = deck_shown.shuffled =
 			deck_shown.querySelector("#shuffled");
@@ -679,6 +733,9 @@ x6 2 7 4 8
 					content.innerHTML = t.content;
 
 					c.dataset.index = offset + i;
+					if (t.style_id !== -1) {
+						c.dataset.style = t.style_id;
+					}
 					c.style.font = t.font;
 
 					shuffled.appendChild(c);
@@ -905,19 +962,25 @@ x6 2 7 4 8
 		Or <q>margin:5 10</q>: the margin for left/right, 
 		and then the margin for top/bottom.
 	</p>
-	<p><q>zoom:1.2</q>: make the cards larger (> 1), or smaller (< 1).
-	</p>
-	<p><q>font:20px Arial</q>: the font to use for subsequent text cards
-		within this deck.
-		<em>Note, must include at least the font name.</em>
-		See <a href="https://developer.mozilla.org/en-US/docs/Web/CSS/font" target="_blank">MDN reference</a> 
-		for more details on how to write fonts.
+	<p>
+		<q>zoom:1.2</q>: make the cards larger (> 1), or smaller (< 1).
 	</p>
 	<p><q>x1 2 0 1 1 19 0</q>: the quanitity of each card from the image,
 		going top-to-bottom, left-to-right.
 		<em>When left out, all cards will be included once.</em>
 		If there are more cards in the image that quantities in the list,
 		the last quantity will be used for the rest of the cards.
+	</p>
+	<p><q>$ {css styles} $ left {...}</q>: styles applied to all cards 
+		within this deck. This is for more advanced deck creators,
+		lets you break things, but lets you have much more complex 
+		text cards. <q>$</q> is the card selector; do whatever else you wish to.
+	</p>
+	<p><q>font:20px Arial</q>: the font to use for subsequent text cards
+		within this deck.
+		<em>Note, must include at least the font name.</em>
+		See <a href="https://developer.mozilla.org/en-US/docs/Web/CSS/font" target="_blank">MDN reference</a> 
+		for more details on how to write fonts.
 	</p>
 	<p>
 		<q>5x Card text</q>: a text card--starting with the quantity,
@@ -952,3 +1015,30 @@ x6 2 7 4 8
 		you want to write it manually.</em>
 	</p>
 </div>
+
+	<!--
+
+# Prestige Buildings
+px: 300x200
+zoom: 0.7
+font:18px Arial
+$ l { width:140px; float:left; } $ txt { float:right; width:150px; } $ b { display:block; }
+1x <l><big>🗿</big><b>Monument</b>🪨🪨🪨</l><txt>2⭐x unused 🪨<br/>+4⭐
+1x <l><big>🔥</big><b>Pyre</b>🪵🪵🪵</l><txt>2⭐x unused 🪵<br/>+4⭐
+1x <l><big>🍴</big><b>Feast</b>🐟🐟🐟</l><txt>Find the 🏠 farthest away.<br/>2⭐x as many 🏠 are that far away
+1x <l><big>🛞</big><b>Cartwright</b>🪨🪵🪵</l><txt>2⭐x 🏠 in one direction from building
+1x <l><big>🏛</big><b>Great Hall</b>🪨🪨🪵</l><txt>⭐x 🏠 in range 2
+1x <l><big>🏡</big><b>Townhouse</b>🪨🐟🐟</l><txt>2⭐x open buildings at range 2
+1x <l><big>🕳️</big><b>Well</b>🪨🪨🐟</l><txt>⭐x distance to closest 🌊
+1x <l><big>⛵</big><b>Shipyard</b>🪵🐟🐟</l><txt>⭐x near + connected 🌊<br/>+2⭐
+1x <l><big>🛏</big><b>Inn</b>🪵🪵🐟</l><txt>2⭐x near empty spaces
+1x <l><big>🪙</big><b>Market</b>🪨🪵🐟</l><txt>3⭐x set of unused resources 🪵🪨🐟 in range 3
+1x <l><big>🗺</big><b>Map Maker</b>🪵🪵✱</l><txt>⭐x <med>○</med>/<med>●</med> in range 3
+1x <l><big>🌉</big><b>Bridge</b>🪨🪨✱</l><txt>Opposite sides must non-🌊.<br/>4⭐x near water
+1x <l><big>🍻</big><b>Pub</b>🪨🪵✱</l><txt>2⭐x unused 🐟
+1x <l><big>📦</big><b>Distributor</b>🐟🐟✱</l><txt>⭐x near shops x <med>○</med> in range 2
+1x <l><big>🍞</big><b>Baker</b>🪨🐟✱</l><txt>⭐x near 🏠 x 🎣 in range 2
+1x <l><big>📚</big><b>School</b>🪵🐟✱</l><txt>⭐x near 🏠 x 🌳 in range 2
+state: -|*|-
+
+	-->
