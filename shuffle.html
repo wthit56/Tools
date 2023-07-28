@@ -15,7 +15,7 @@
 	#status_display.shown { display:block; }
 	
 	body { text-align:center; }
-	.card { display:inline-block; text-align:center; width:150px; height:200px; }
+	.card { display:inline-block; text-align:center; width:150px; height:210px; }
 	.card.text { box-shadow:0 0 1px black; }
 	.controls { margin:1em; }
 
@@ -63,6 +63,8 @@
 	body .play_mode { display:none; }
 	body.is-playing .edit_mode { display:none; }
 	body.is-playing .play_mode { display:initial; }
+
+	body.is-playing .card { user-select:none; }
 
 	body .from_edit { display:none; }
 	body.edited .fresh { display:none; }
@@ -138,8 +140,8 @@
 	</span><hr/>
 	<input id="local_images" type="file" accept="image/*" multiple />
 	<button onclick="local_images.value='';" title="Clear files">x</button>
-	<br/><em>Select files to use with "local:" decks.<br/>
-		Clear and re-select to reload changed images.</em>
+	<p><em>Select files to use with "local:" decks.<br/>
+		Clear and re-select to reload changed images.</em></p>
 </div>
 
 
@@ -456,7 +458,6 @@ x6 2 7 4 8
 			decks.forEach(setup_deck);
 			if (errors.report()) { return; }
 
-			console.log(card_styles);
 			card_styles.setup();
 			
 			show_src(false);
@@ -484,13 +485,9 @@ x6 2 7 4 8
 					"\n"
 				);
 			});
-			console.log(card_styles[i],"->",styles);
 			css += styles;
-
-			// console.log(deck.name+":", styles);
 		}
 		card_styles_css.innerHTML = css;
-		console.log(css);
 	}
 	
 	var scan_src = /^\#(<)?[ \t]*(\S.*)$|^x((?:\d+[ \t]*)+)$|^((?:file|https?):.+)$|^(\d+)x[ \t]+(.+)$|^\.(<)?[ \t]*(.+)$|^(\$.*)$|^(\w+):[ \t]*(.+)$/gm;
@@ -550,7 +547,6 @@ x6 2 7 4 8
 			}
 			else if (styles) {
 				card_styles.use = true;
-				console.log(deck.name+":", styles);
 				card_styles.push(styles);
 			}
 			else if (key) {
@@ -634,6 +630,7 @@ x6 2 7 4 8
 		
 		deck_shown.querySelector("#name_display").innerText = deck.name;
 
+		var iwidth = 150, iheight = 210;
 		if (deck.img) {
 			var iwidth = deck.img.width - (deck.margin.x * 2);
 			var iheight = deck.img.height - (deck.margin.y * 2);
@@ -675,7 +672,6 @@ x6 2 7 4 8
 		}
 		
 		deck_shown.drawn.style.minHeight = ((deck.cheight * deck.zoom) + (CARD_MARGIN * 2)) + "px";
-
 	
 		// add cards to shuffled deck
 		var q, use_last = false;
@@ -971,17 +967,37 @@ x6 2 7 4 8
 		If there are more cards in the image that quantities in the list,
 		the last quantity will be used for the rest of the cards.
 	</p>
-	<p><q>$ {css styles} $ left {...}</q>: styles applied to all cards 
-		within this deck. This is for more advanced deck creators,
+	<p>
+		<q>$ { background:red; }</q>:
+		<a href="https://developer.mozilla.org/en-US/docs/Web/CSS" target="_blank"">CSS styles</a>
+		applied to all following cards within this deck
+		until another style line is found.
+		This is for more advanced deck creators,
 		lets you break things, but lets you have much more complex 
-		text cards. <q>$</q> is the card selector; do whatever else you wish to.
+		text cards.
 	</p>
-	<p><q>font:20px Arial</q>: the font to use for subsequent text cards
+	<p>
+		A style consists of a selector and a declaration.
+		In the <q>$ img { border:1px solid red; }</q> code,
+		the selector is <q>$ img</q>--selecting any &lt;img> tags
+		within a card.
+		And the declaration is <q>border:1px solid red;</q>--giving
+		the image a red border 1 pixel wide.
+		You can select different things at the same time by 
+		adding more selectors and commas in between, like this: <q>$ img, $ a {...}</q>.
+	</p>
+	<p>
+		You can add as many such styles in the same line to apply 
+		them all to the cards.
+		If the code <q>$ { background:green; }</q> was added,
+		the card itself would have a green background.
+	</p>
+	<!--<p><q>font:20px Arial</q>: the font to use for subsequent text cards
 		within this deck.
 		<em>Note, must include at least the font name.</em>
 		See <a href="https://developer.mozilla.org/en-US/docs/Web/CSS/font" target="_blank">MDN reference</a> 
 		for more details on how to write fonts.
-	</p>
+	</p>-->
 	<p>
 		<q>5x Card text</q>: a text card--starting with the quantity,
 		and followed by the contents of the card.
@@ -992,7 +1008,8 @@ x6 2 7 4 8
 		or <a href="https://emojidb.org/" target="_blank">EmojiDB</a>
 		to find emoji to use for your cards.</em>
 	</p>
-	<p>These can also include HTML tags.
+	<p>These can also include 
+		<a href="https://developer.mozilla.org/en-US/docs/Web/HTML" target="_blank"">HTML tags</a>.
 		Here are a few useful tags, but any tags should work.</p>
 	<ul>
 		<li><q>&lt;br/></q>: new line.</li>
@@ -1005,6 +1022,8 @@ x6 2 7 4 8
 			useful for making an emoji slightly bigger to match the text,
 			or headings.</li>
 		<li><q>&lt;sml>text&lt;/sml></q>: smaller text.</li>
+		<li>Feel free to make up your own tags, and use a 
+			<q>$ tag {style}</q> line to define how they look.</li>
 	</ul>
 	<p><q>state:0 3|?|1 2 4</q>: which cards are in the shuffled deck,
 		being shown, and discarded.
