@@ -506,7 +506,7 @@ x6 2 7 4 8
 			if (info_side) { error("Info to the side, but no non-side before it."); return; }
 		}
 		if (name) {
-			if (deck && !deck.info && !deck.img_url && !deck.text_cards) {
+			if (deck && !deck.info && !deck.img_url && !deck.local && !deck.text_cards) {
 				error("No image defined for deck.");
 				return;
 			}
@@ -984,7 +984,7 @@ x6 2 7 4 8
 		And the declaration is <q>border:1px solid red;</q>--giving
 		the image a red border 1 pixel wide.
 		You can select different things at the same time by 
-		adding more selectors and commas in between, like this: <q>$ img, $ a {...}</q>.
+		adding mroe selectors and commas in between, like this: <q>$ img, $ a {...}</q>.
 	</p>
 	<p>
 		You can add as many such styles in the same line to apply 
@@ -992,12 +992,12 @@ x6 2 7 4 8
 		If the code <q>$ { background:green; }</q> was added,
 		the card itself would have a green background.
 	</p>
-	<!--<p><q>font:20px Arial</q>: the font to use for subsequent text cards
+	<p><q>font:20px Arial</q>: the font to use for subsequent text cards
 		within this deck.
 		<em>Note, must include at least the font name.</em>
 		See <a href="https://developer.mozilla.org/en-US/docs/Web/CSS/font" target="_blank">MDN reference</a> 
 		for more details on how to write fonts.
-	</p>-->
+	</p>
 	<p>
 		<q>5x Card text</q>: a text card--starting with the quantity,
 		and followed by the contents of the card.
