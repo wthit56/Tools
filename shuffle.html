@@ -3,6 +3,8 @@
 <title>Shuffle | virtual card decks for flip n' write board games</title>
 <body>
 <style type="text/css">
+	a { color:black; font-weight:bold; }
+	
 	#status_display { 
 		display:none; color:black;
 		background:#eee; border:solid #999;
@@ -29,7 +31,10 @@
 	#explanation q { background:#eee; border:1px solid #999; border-radius:3px;
 				   padding:0 2px; font-family:monospace; }
 	#explanation q::before, #explanation q::after {content:"";}
-		
+
+	#explanation h2 { margin-bottom:0; text-decoration:underline; }
+	#explanation h2 + p { margin-top:0.5em; }
+	
 	.info { margin:1em auto; font-size:20px; white-space:break-spaces;
 		  box-shadow:0 0; width:100%; text-align:center; 
 		  background:transparent; border:none;
@@ -44,16 +49,37 @@
 		margin:1px; white-space:nowrap;
 	}
 	
-	#drawn { line-height:0; margin:1em; }
-	#drawn .card {  line-height:normal; }
-	#drawn .card.text { position:relative; background-color:white; color:black; }
-	#drawn .card.text > .content { position:absolute; top:50%; transform:translateY(-50%); left:5px; right:5px; max-height:100%; pointer-events:none; }
+	#card-sets { line-height:0; margin:1em; }
+
+	#drawn { display:none; }
+	.card { line-height:normal; }
+	.card.text { position:relative; background-color:white; color:black; }
+	.card.text > .content { position:absolute; top:50%; transform:translateY(-50%); left:5px; right:5px; max-height:100%; pointer-events:none; }
 
 	.deck + .deck, .deck + .info { margin-left:1em; }
 
-	#shuffled { display:none; zoom:0.5; }
-	#discarded { display:none; zoom:0.5; }
+	#shuffled { display:none;
+		background:repeating-linear-gradient(-45deg, 
+			rgba(0,255,0,0.1) 0px,
+			rgba(0,255,0,0.05) 50px,
+			transparent 50px,
+			transparent 100px
+		);
+	}
+	#discarded { display:none;
+		background:repeating-linear-gradient(45deg, 
+			rgba(255,0,0,0.1) 0px,
+			rgba(255,0,0,0.05) 50px,
+			transparent 50px,
+			transparent 100px
+			);
+	}
 
+	#card-sets[data-show-frame="0"] #shuffled { display:block; }
+	#card-sets[data-show-frame="1"] #drawn { display:block; }
+	#card-sets[data-show-frame="2"] #discarded { display:block; }
+
+	
 	#play_controls { display:none; }
 	
 	h1 { margin:1em; font-size:200%; font-weight:bold; margin:0; }
@@ -83,7 +109,7 @@
 		{ border-bottom-color:white; background-color:#333; }
 
 
-		.deck #actions { overflow-x:auto; white-space:nowrap; }
+	.deck #actions { overflow-x:auto; white-space:nowrap; }
 
 	#actions { float:right; display:inline-block; }
 	#actions button { line-height:16px; }
@@ -95,7 +121,7 @@
 
 <div id="prototype">
 	<span class="card" title="Click to discard"></span>
-	<div class="deck" tabindex="0">
+	<div class="deck" tabindex="0" data-show-frame="1">
 		<header>
 			<h1 id="name_display"></h1>
 			<div id="actions">
@@ -108,11 +134,12 @@
 			</div>
 			<br/>
 		</header>
-			
-		<div id="drawn"></div>
-	
-		<div id="shuffled"></div>
-		<div id="discarded"></div>
+
+		<div id="card-sets">
+			<div id="shuffled"></div>
+			<div id="drawn"></div>
+			<div id="discarded"></div>
+		</div>
 	</div>
 </div>
 
@@ -203,6 +230,7 @@ x6 2 7 4 8
 <style id="card_style" type="text/css"></style>
 <script>
 	var CARD_MARGIN = 5;
+	var CSS;
 	
 	var prototype = document.getElementById("prototype");
 	prototype.parentNode.removeChild(prototype);
@@ -386,6 +414,8 @@ x6 2 7 4 8
 
 	var played = false;
 	function play() {
+		CSS = "";
+		
 		if (!played) {
 			played = true;
 			window.onbeforeunload = function() {
@@ -459,6 +489,8 @@ x6 2 7 4 8
 			if (errors.report()) { return; }
 
 			card_styles.setup();
+
+			card_styles_css.innerHTML = CSS;
 			
 			show_src(false);
 		}, function do_catch() {
@@ -474,7 +506,7 @@ x6 2 7 4 8
 	card_styles.setup = function() {
 		var css = "";
 		for (var i = 0; i < card_styles.length; i++) {
-			var s = ` .deck #drawn .card[data-style="${i}"] `;
+			var s = ` .deck #card-sets .card[data-style="${i}"] `;
 			var styles = card_styles[i].replace(/(.*?)(\{[^}]*\})/g, function(m,
 				selector, style
 			) {
@@ -487,7 +519,7 @@ x6 2 7 4 8
 			});
 			css += styles;
 		}
-		card_styles_css.innerHTML = css;
+		CSS += css;
 	}
 	
 	var scan_src = /^\#(<)?[ \t]*(\S.*)$|^x((?:\d+[ \t]*)+)$|^((?:file|https?):.+)$|^(\d+)x[ \t]+(.+)$|^\.(<)?[ \t]*(.+)$|^(\$.*)$|^(\w+):[ \t]*(.+)$/gm;
@@ -616,6 +648,8 @@ x6 2 7 4 8
 			deck_shown.querySelector("#discarded");
 		var discarded_cards = discarded.childNodes;
 
+		var cardSets = deck_shown.querySelector("#card-sets");
+		
 		deck_shown.draw_button = deck_shown.querySelector("#draw_button");
 		deck_shown.draw_all_button = deck_shown.querySelector("#draw_all_button");
 		deck_shown.roll_button = deck_shown.querySelector("#roll_button");
@@ -670,8 +704,9 @@ x6 2 7 4 8
 		if (deck.img_url) {
 			card.style.backgroundImage = `url("${deck.img_url}")`;
 		}
-		
-		deck_shown.drawn.style.minHeight = ((deck.cheight * deck.zoom) + (CARD_MARGIN * 2)) + "px";
+
+		CSS += `.deck#${id} #card-sets > div { min-height:${((deck.cheight * deck.zoom) + (CARD_MARGIN * 2))}px; }`
+		// cardSets.style.minHeight =  + "px";
 	
 		// add cards to shuffled deck
 		var q, use_last = false;
@@ -808,24 +843,37 @@ x6 2 7 4 8
 			e.preventDefault();
 			e.stopPropagation();
 
-			deck_shown.focus();
+			// deck_shown.focus();
 
 			if (e.target.classList.contains("card")) {
-				discarded.prepend(e.target);
+				switch (show_frame.value) {
+					case FRAME_SHUFFLED:
+						drawn.append(e.target);
+						break;
+					case FRAME_DRAWN:
+						discarded.prepend(e.target);
+						break;
+					case FRAME_DISCARDED:
+						drawn.append(e.target);
+						break;
+				}
 			}
 			else { // buttons
 				switch (e.target.id) {
 					case "draw_button":
 						drawn.appendChild(shuffled_cards[shuffled_cards.length * Math.random() | 0]);
+						show_frame.value = FRAME_DRAWN;
 						break;
 
 					case "draw_all_button":
 						move_all(shuffled, drawn);
+						show_frame.value = FRAME_DRAWN;
 						break;
 
 					case "roll_button":
 						deck_shown.shuffle_button.click();
 						deck_shown.draw_button.click();
+						show_frame.value = FRAME_DRAWN;
 						break;
 
 					case "discard_button":
@@ -836,6 +884,7 @@ x6 2 7 4 8
 						deck_shown.drawn.appendChild(
 							deck_shown.discarded.lastElementChild
 						);
+						show_frame.value = FRAME_DRAWN;
 						break;
 					
 					case "shuffle_button":
@@ -848,13 +897,36 @@ x6 2 7 4 8
 			update_controls(deck_shown);
 		}, true);
 
+		var FRAME_SHUFFLED = 0,
+			FRAME_DRAWN = 1,
+			FRAME_DISCARDED = 2;
+		var show_frame = Object.create({}, {
+			value: {
+				set: function(v) {
+					show_frame_value = v % 3;
+					cardSets.dataset.showFrame = show_frame_value;
+				},
+				get: function() {
+					return show_frame_value;
+				}
+			}
+		});
+		var show_frame_value;
+		
+		show_frame.value = 1;
+	
 		deck_shown.addEventListener("keyup", function(e) {
 			if (e.shiftKey || e.ctrlKey) { return; }
-			
+
 			e.preventDefault();
 			e.stopPropagation();
 			
 			switch(e.key) {
+				case "Tab":
+					show_frame.value++;
+					deck_shown.focus();
+					break;
+	
 				case "1": case "2": case "3": case "4": case "5":
 				case "6": case "7": case "8": case "9":
 					for (var i = 0; i < +e.key; i++) {
@@ -879,6 +951,8 @@ x6 2 7 4 8
 		update_controls(deck_shown);
 
 		decks_row.appendChild(deck_shown);
+
+		return false;
 	}
 
 	function move_all(from, to) {
@@ -918,8 +992,15 @@ x6 2 7 4 8
 	<p>Type text into the source box above, 
 		and click "Play" to load it.
 		Drag the bottom-right corner of the box to adjust its size.
+		Skip to <a href="#codes">Codes</a>.
 	</p>
-	<p>Drag the BG slider at the top of the page
+	<p>
+		While playing, shortcuts can be used to control
+		the currently-focussed deck.
+		Skip to <a href="#controls">Controls</a>.
+	</p>
+	<p>
+		Drag the BG slider at the top of the page
 		to adjust how dark/light the page background is.
 		This can help to avoid burnout in your screen if the page
 		doesn't change for some time.
@@ -930,8 +1011,10 @@ x6 2 7 4 8
 		are where, and notes will reflect any edited text.
 		The source can be saved in a text file or message to save the current state, 
 		and pasted in to resume playing from that state.
-		The source text works as follows:
 	</p>
+	
+	<h2 id="codes">Codes</h2>
+	<p>The source text works as follows:</p>
 	<p><q>. Notes</q>: An editable note that is displayed 
 		between decks.
 		While playing, notes can be edited during the game,
@@ -1033,6 +1116,21 @@ x6 2 7 4 8
 		<em>You don't have to worry about how this works unless
 		you want to write it manually.</em>
 	</p>
+	
+	<h2 id="controls">Controls</h2>
+	<p><q>Click on a card</q> to move it between card groups.
+		A drawn card will move to the start of discarded.
+		A discarded card will move to the end of drawn.
+		A shuffled card will move to the end of drawn.
+	</p>
+	<p>Click a deck or anything within the deck to "focus" on it.
+		While focussed on a deck, you can control it with keyboard shortcuts:</p>
+	<p><q>Tab</q> cycles through viewing 
+		the drawn, discarded, and shuffled cards.</p>
+	<p><q>1 - 9</q> draws that many cards from the shuffled pile.</p>
+	<p><q>0</q> discards all drawn cards.</p>
+	<p><q>S</q> shuffles all cards.</p>
+	<p><q>R</q> "rolls": shuffles all cards and draws 1 at random.</p>
 </div>
 
 	<!--
