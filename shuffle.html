@@ -4,6 +4,7 @@
 <body>
 <style type="text/css">
 	a { color:black; font-weight:bold; }
+	body.dark a { color:white; }
 	
 	#status_display { 
 		display:none; color:black;
@@ -29,7 +30,7 @@
 
 	#explanation { text-align:left; line-height:140%; max-width:500px; margin:0 auto; }
 	#explanation q { background:#eee; border:1px solid #999; border-radius:3px;
-				   padding:0 2px; font-family:monospace; }
+				   padding:0 2px; font-family:monospace; color:black; }
 	#explanation q::before, #explanation q::after {content:"";}
 
 	#explanation h2 { margin-bottom:0; text-decoration:underline; }
@@ -56,6 +57,32 @@
 	.card.text { position:relative; background-color:white; color:black; }
 	.card.text > .content { position:absolute; top:50%; transform:translateY(-50%); left:5px; right:5px; max-height:100%; pointer-events:none; }
 
+	.card > .markers { position:absolute; z-index:2; pointer-events:none;
+		text-align:right; right:0; top:-0.5em; font-size:20px;
+	}
+	.card > .markers m { display:none;
+		background:white; border-radius:50%; color:black; }
+	.card > .markers.marker-0 m[m0] { display:inline; }
+	.card > .markers.marker-1 m[m1] { display:inline; }
+	.card > .markers.marker-2 m[m2] { display:inline; }
+	.card > .markers.marker-3 m[m3] { display:inline; }
+	.card > .markers.marker-4 m[m4] { display:inline; }
+	.card > .markers.marker-5 m[m5] { display:inline; }
+	.card > .markers.marker-6 m[m6] { display:inline; }
+	.card > .markers.marker-7 m[m7] { display:inline; }
+	.card > .markers.marker-8 m[m8] { display:inline; }
+	.card > .markers.marker-9 m[m9] { display:inline; }
+	.card m[m0]::before { content:"⓪"; }
+	.card m[m1]::before { content:"①"; }
+	.card m[m2]::before { content:"②"; }
+	.card m[m3]::before { content:"③"; }
+	.card m[m4]::before { content:"④"; }
+	.card m[m5]::before { content:"⑤"; }
+	.card m[m6]::before { content:"⑥"; }
+	.card m[m7]::before { content:"⑦"; }
+	.card m[m8]::before { content:"⑧"; }
+	.card m[m9]::before { content:"⑨"; }
+	
 	.deck + .deck, .deck + .info { margin-left:1em; }
 
 	#shuffled { display:none;
@@ -114,13 +141,17 @@
 	#actions { float:right; display:inline-block; }
 	#actions button { line-height:16px; }
 
+	
+
 </style>
 <style id="card_styles_css"></style>
 
 <div id="status_display">Test</div>
 
 <div id="prototype">
-	<span class="card" title="Click to discard"></span>
+	<span class="card" title="Click to discard">
+		<span class="markers"><m m0></m><m m1></m><m m2></m><m m3></m><m m4></m><m m5></m><m m6></m><m m7></m><m m8></m><m m9></m></span>
+	</span>
 	<div class="deck" tabindex="0" data-show-frame="1">
 		<header>
 			<h1 id="name_display"></h1>
@@ -229,6 +260,7 @@ x6 2 7 4 8
 
 <style id="card_style" type="text/css"></style>
 <script>
+	var MARKERS_SET = false;
 	var CARD_MARGIN = 5;
 	var CSS;
 	
@@ -281,6 +313,33 @@ x6 2 7 4 8
 		return [...nodes].map(function(c) { return c.dataset.index; });
 	}
 
+
+	document.addEventListener("keyup", function(e) {
+		console.log("document keyup while hovering", mousedover);
+		
+		if (e.shiftKey && mousedover.classList.contains("card")) { }
+		else { return; }
+		
+		var n = e.keyCode - 48;
+		if (n >= 0 && n <= 9) {
+			mousedover.querySelector(".markers")
+				.classList.toggle("marker-" + n);
+
+			MARKERS_SET = true;
+			
+			e.stopPropagation();
+			e.preventDefault();
+		}
+	}, true);
+	var mousedover = null;
+	document.addEventListener("mouseover", function(e) {
+		mousedover = e.target;
+		console.log("mouseover", e.target);
+	}, true);
+
+
+
+				
 	var decks = [], deck;
 	var decks_row;
 
@@ -351,6 +410,7 @@ x6 2 7 4 8
 	
 	edit_button.onclick = function() {
 		document.body.classList.add("edited");
+		if (MARKERS_SET) { alert("Warning: Markers have been set. Loading will reset markers."); }
 		
 		src_input.value = decks.map(function(deck) {
 			if (deck.info) {
@@ -511,7 +571,9 @@ x6 2 7 4 8
 				selector, style
 			) {
 				return (
-					selector.replace(/\$(?=\s+[^\{])/g, s + " .content ")
+					selector
+						.replace(/\$(\d)/g, s + " > .markers m[m$1]::before")
+						.replace(/\$(?=\s+[^\{])/g, s + " .content ")
 						.replace(/\$(?=[\s\{])/g, s) +
 					style +
 					"\n"
@@ -895,7 +957,7 @@ x6 2 7 4 8
 			}
 			
 			update_controls(deck_shown);
-		}, true);
+		});
 
 		var FRAME_SHUFFLED = 0,
 			FRAME_DRAWN = 1,
@@ -916,8 +978,7 @@ x6 2 7 4 8
 		show_frame.value = 1;
 	
 		deck_shown.addEventListener("keyup", function(e) {
-			if (e.shiftKey || e.ctrlKey) { return; }
-
+			console.log("deck keyup");
 			e.preventDefault();
 			e.stopPropagation();
 			
@@ -929,8 +990,10 @@ x6 2 7 4 8
 	
 				case "1": case "2": case "3": case "4": case "5":
 				case "6": case "7": case "8": case "9":
-					for (var i = 0; i < +e.key; i++) {
-						deck_shown.draw_button.click();
+					if (!e.shiftKey) {
+						for (var i = 0; i < +e.key; i++) {
+							deck_shown.draw_button.click();
+						}
 					}
 					break;
 
@@ -967,6 +1030,7 @@ x6 2 7 4 8
 			else { console.error(`Could not find card with index ${indices[i]}`); }
 		}
 	}
+
 
 
 
@@ -1050,7 +1114,7 @@ x6 2 7 4 8
 		If there are more cards in the image that quantities in the list,
 		the last quantity will be used for the rest of the cards.
 	</p>
-	<p>
+	<p id="style-ref">
 		<q>$ { background:red; }</q>:
 		<a href="https://developer.mozilla.org/en-US/docs/Web/CSS" target="_blank"">CSS styles</a>
 		applied to all following cards within this deck
@@ -1074,6 +1138,10 @@ x6 2 7 4 8
 		them all to the cards.
 		If the code <q>$ { background:green; }</q> was added,
 		the card itself would have a green background.
+	</p>
+	<p>
+		Use <q>$0 { content:"😊"; }</q> to change the 0 maker to 😊.
+		<q>$6 { content: "😆"; }</q> changes the 6 maker, etc.
 	</p>
 	<p><q>font:20px Arial</q>: the font to use for subsequent text cards
 		within this deck.
@@ -1131,6 +1199,10 @@ x6 2 7 4 8
 	<p><q>0</q> discards all drawn cards.</p>
 	<p><q>S</q> shuffles all cards.</p>
 	<p><q>R</q> "rolls": shuffles all cards and draws 1 at random.</p>
+	<p><q>Shift + number</q> adds a corresponding marker to the hovered card.
+		By default these markers are corresponding numbers: ⓪①②③④⑤⑥⑦⑧⑨,
+		but can be changed using a "<a href="#style-ref">style</a>" line.
+	</p>
 </div>
 
 	<!--
