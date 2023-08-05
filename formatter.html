@@ -1,0 +1,481 @@
+<!doctype html>
+
+<style>
+	hmtl, body { width:100%; height:100%; padding:0; margin:0; }
+	main {
+		display:grid; grid-template-columns:50% 50%;
+		grid-template-rows:2em 1fr;
+		position:absolute; top:0; bottom:0; width:100%;
+	}
+
+	#top {
+		grid-column: 1 / -1; margin:0; 
+		border-bottom:1px solid black;
+		font-size:120%; padding:0.3em 0 0 0.4em;
+		background:buttonface;
+	}
+	
+	#left, #right { 
+		min-height:1em; position:relative;
+		box-sizing:border-box;
+	}
+	
+	#left {
+		position:relative;
+		border-right:1px solid black;
+	}
+	#placeholder { padding:1em; position:absolute; }
+	
+	#input {
+		padding:1em; box-sizing:border-box; 
+		height:100%; width:100%; overflow:auto;
+	}
+	#input img { max-width:100%; }
+	
+	#right {
+		display:grid; font-size:120%;
+		grid-template-rows:3em 1fr;
+		transition:grid-template-rows 0.1s ease-out;
+	}
+	#right textarea { font-family:monospace; font-size:inherit; }
+	#right:has(#format:focus) { grid-template-rows:11em 1fr; }
+
+	#right textarea {
+		display:inline-block; padding:1em;
+		border:0; resize:none;
+	}
+
+	#format { white-space:nowrap; }
+
+	#right #output { border-top:1px solid #999; }
+	#output.processing { opacity:0.5; }
+
+	.info-189279123 {
+		overflow:hidden; position:absolute; top:0; right:0;
+		width:1em; height:1em; border-radius:0 0 0 5px;
+		background:#eee; box-shadow: 0 0 5px rgba(0,0,0,0.2);
+	}
+	.info-189279123 span {
+		float:right; width:1em; line-height:1em; text-align:center;
+		cursor:help;
+	}
+	.info-189279123 div { margin:0; padding:0.5em; display:none; }
+	.info-189279123 q::before, .info-189279123 q::after { content:""; }
+	.info-189279123 q {
+		font-family:monospace; background:#fff; border-radius:2px;
+		padding: 0 0.2em;
+	}
+	.info-189279123 p { margin:0.5em 0 0 0; }
+	.info-189279123 p:first-of-type { margin-top:0; }
+	.info-189279123:hover { width:100%; height:auto; }
+	.info-189279123:hover div { display:block; }
+	.info-189279123:hover span { background:black; color:white; border-radius:0 0 0 5px; }
+</style>
+
+<main>
+	<h1 id="top">Formatter</h1>
+	<div id="left">
+		<div class="info-189279123">
+			<span>ℹ</span>
+			<div>
+				<p>Skips tumblr image ALT.</p>
+				<p>Links with text content will be unformatted plain text links,
+					and will show just the text unless a rendering rule is used.</p>
+			</div>
+		</div>
+		<div id="placeholder">INPUT</div>
+		<div id="input" class="content" contenteditable></div>
+	</div>
+	<div id="right">
+		<div class="info-189279123">
+			<span>ℹ</span>
+			<div>
+				<p><strong>Block, quote, bold, italic, underline</strong>:
+					<q>before:type:after</q> will add the "before" and "after"
+					around that kind of content.</p>
+				<p><strong>Rule, newline</strong>:
+					<q>type:replace</q> will turn it into whatever is after the ":".</p>
+				<p><strong>Image template, link template</strong>:
+					<q>&lt;img src=":img:" alt=":img_alt:" /></q> 
+					replaces the ":data:" parts with the relevant data,
+					and uses that in place of the content.</p>
+				<p>Anything that's not one of these templates is ignored.
+					Use <q>\n</q> to insert new lines.</p>
+			</div>
+		</div>
+		<textarea id="format" rows="10" cols="40">FORMATTING
+<p>:para:</p>\n
+<blockquote>:quote:</blockquote>\n
+<strong>:bold:</strong>
+<em>:italic:</em>
+<u>:underline:</u>
+<img src=":img:" alt=":img_alt:" />
+<a href=":link:">:link_text:</a>
+newline:<br/>
+rule:<hr/></textarea>
+		<textarea id="output" rows="10" cols="40">OUTPUT</textarea>
+	</div>
+</main>
+
+
+<script>
+	var REPARSE_DELAY_MS = 1000,
+		RESIMPLIFY_DELAY_MS = 100;
+	
+	/*{
+		para_start:"<p>", para_end:"</p>\n",
+		quote_start:"<blockquote>", quote_end:"</blockquote>\n",
+		br:"<br/>\n",
+		bold_start:"<strong>", bold_end:"</strong>",
+		italic_start:"<em>", italic_end:"</em>",
+		img_template: `<img src=":img:" alt=":img_alt:" />`,
+		link_template: `<a href=":link:">:link_text:</a>`,
+		hr:"<hr/>",
+		underline_start:"<u>", underline_end:"</u>"
+	};*/
+
+	var NO_STYLE = { NO_STYLE:true };
+
+	function debounce(fn, delay) {
+		var retry_id, allowed_from = 0;
+
+		return function debounce_proxy() {
+			var now = performance.now();
+			if (now >= allowed_from) {
+				fn.apply(this, arguments);
+			}
+			else {
+				if (retry_id) { clearTimeout(retry_id); }
+				retry_id = setTimeout(debounce_proxy, delay);
+			}
+			
+			allowed_from = now + delay;
+		}
+	}
+
+	output.processing = function(is_processing) {
+		output.disabled = is_processing;
+	};
+	
+	var parse = (function() {
+		var parse = debounce(function() {
+			parse.parts.length = 0;
+			parse_elements(NO_STYLE, input.childNodes, parse.parts);
+			
+			simplify();
+		}, REPARSE_DELAY_MS);
+
+		// var tree = "", spaces = "            ";
+		var blocks_open = 0, is_block = false;
+		function parse_elements(parent_style, elements, parts) {
+			for (var i = 0; i < elements.length; i++) {
+				var c = elements[i];
+				if (c.classList && 
+					c.classList.contains("tmblr-alt-text-helper")
+				) {
+					// skip tumblr image ALT
+					continue;
+				}
+
+				if (c.tagName === "IMG") {
+					parts.push({ img:true, element:c });
+				}
+				else if (c.tagName === "A" && c.innerText) {
+					parts.push({ link:true, element:c, style:window.getComputedStyle(c) });
+				}
+				else if (c.tagName === "BR") {
+					parts.push({ br:true });
+				}
+				else if (c.tagName === "HR") {
+					parts.push({ hr:true });
+				}
+				else if (c.nodeType === 1) {
+					// tag
+					var cstyle = window.getComputedStyle(c);
+
+					is_block = (/(?:^| )(?:block|list-item|table|table-row|inline-table|flex|grid)(?: |$)/.test(cstyle.display));
+
+					if (is_block) {
+						var last = parts[parts.length-1];
+						if (!last || !last.block) {
+						// if (c.parentNode === input) {
+							parts.push({ block:true, element:c });
+						}
+					}
+
+					if (c.childNodes.length > 0) {
+						parse_elements(cstyle, c.childNodes, parts);
+					}
+
+				}
+				else if (c.nodeType === 3) {
+					// text
+					var t = c.textContent;
+					if (t) { parts.push({ text:t, style:parent_style }); }
+				}
+			}
+		}
+
+		parse.parts = [];
+		parse.old = false;
+		
+		
+		return parse;
+	})();
+
+	format.onchange = format.oninput = function() {
+		if (format.value !== format.old_value) {
+			console.log("format changed");
+			output.processing(true);
+			format.old = true;
+			format.old_value = format.value;
+			console.log("format stale");
+			simplify();
+		}
+	};
+	format.old = true;
+	format.parse = (function() {
+		var para_start, para_end,
+			quote_start, quote_end,
+			br,
+			bold_start, bold_end,
+			italic_start, italic_end,
+			img_template, 
+			hr, 
+			underline_start, underline_end;
+
+		var find_nl = /\\n/g, nl = "\n";
+		
+		var parse_format = /^(?:((.*?):para:(.*))|((.*?):quote:(.*))|(newline:(.*))|((.*?):bold:(.*))|((.*?):italic:(.*))|(.*:img(?:_alt)?:.*)|(.*:link(?:_text)?.*)|(rule:(.*))|((.*):underline:(.*)))$/gm;
+		function process_format(
+			m,
+			_para, _para_start, _para_end,
+			_quote, _quote_start, _quote_end,
+			_br, _br_t,
+			_bold, _bold_start, _bold_end,
+			_italic, _italic_start, _italic_end,
+			_img_template, _link_template,
+			_hr, _hr_t,
+			_underline, _underline_start, _underline_end
+		) {
+			if (_para) {
+				para_start = _para_start.replace(find_nl, nl);
+				para_end = _para_end.replace(find_nl, nl);
+			}
+			else if (_quote) {
+				quote_start = _quote_start.replace(find_nl, nl);
+				quote_end = _quote_end.replace(find_nl, nl);
+			}
+			else if (_br) {
+				br = _br_t.replace(find_nl, nl);
+			}
+			else if (_bold) {
+				bold_start = _bold_start.replace(find_nl, nl);
+				bold_end = _bold_end.replace(find_nl, nl);
+			}
+			else if (_italic) {
+				italic_start = _italic_start.replace(find_nl, nl);
+				italic_end = _italic_end.replace(find_nl, nl);
+			}
+			else if (_img_template) {
+				img_template = _img_template.replace(find_nl, nl);
+			}
+			else if (_link_template) {
+				link_template = _link_template.replace(find_nl, nl);
+			}
+			else if (_hr) {
+				hr = _hr_t.replace(find_nl, nl);
+			}
+			else if (_underline) {
+				underline_start = _underline_start.replace(find_nl, nl);
+				underline_end = _underline_end.replace(find_nl, nl);
+			}
+		}
+		
+		return function format_parse(src) {
+			para_start = para_end =
+			quote_start = quote_end =
+			br =
+			bold_start = bold_end =
+			italic_start = italic_end =
+			underline_start = underline_end =
+			img_template = 
+			hr = "";
+
+			link_template = ":link_text:";
+
+			format.value.replace(parse_format, process_format);
+	
+			return {
+				para_start, para_end,
+				quote_start, quote_end,
+				br,
+				bold_start, bold_end,
+				italic_start, italic_end,
+				img_template, 
+				link_template, 
+				hr,
+				underline_start, underline_end
+			};		
+		};
+	})();
+
+	var default_config = format.parse(format.value);
+
+
+	var simplify = (function() {
+		var para_start, para_end,
+			quote_start, quote_end,
+			br,
+			bold_start, bold_end,
+			italic_start, italic_end,
+			img_template, 
+			link_template, 
+			hr;
+			
+		var config;
+		
+		var simplify = debounce(function() {
+			if (format.old) {
+				console.log("rebuild format");
+				config = format.parse(format.value);
+				format.old = false;
+			}
+
+			if (pasted) {
+				ignore_next_mutation = true;
+				input.innerHTML = render(default_config);
+				pasted = false;
+			}
+
+			output.value = render(config);
+			output.processing(false);
+		}, RESIMPLIFY_DELAY_MS);
+
+		return simplify;
+	})();
+
+	var render = (function() {
+		var simple = [],
+			block = "",
+			bold = false, italic = false, underline = false;
+
+		var find_img = /:img:/g, find_img_alt = /:img_alt:/g;
+		var find_link = /:link:/g, find_link_text = /:link_text:/g;
+
+		function render(config) {
+			console.log("rendering", config);
+			simple.length = 0;
+			for (var i = 0; i < parse.parts.length; i++) {
+				var p = parse.parts[i];
+				if (p.block) {
+					close(config);
+					var n = parse.parts[i+1];
+					if (!n || !n.block) { // not instantly closed
+						if (p.element.tagName === "BLOCKQUOTE") {
+							simple.push(config.quote_start); block = "blockquote";
+						}
+						else {
+							simple.push(config.para_start); block = "p";
+						}
+					}
+				}
+				else if (p.text || p.link) {
+					if (/^(?:bold|bolder|[7-9]00)$/.test(p.style.fontWeight)) {
+						if (!bold) {
+							simple.push(config.bold_start); bold = true;
+						}
+					}
+					else if (bold) {
+						simple.push(config.bold_end); bold = false;
+					}
+					
+					if (/^(?:italic|oblique(?: .+))$/.test(p.style.fontStyle)) {
+						if (!italic) {
+							simple.push(config.italic_start); italic = true;
+						}
+					}
+					else if (italic) {
+						simple.push(config.italic_end); italic = false;
+					}
+
+					if (/(?:^|\S )underline( |$)/.test(p.style.textDecoration)) {
+						if (!underline) {
+							simple.push(config.underline_start);
+							underline = true;
+						}
+					}
+					else if (underline) {
+						simple.push(config.underline_end);
+						underline = false;
+					}
+
+					if (p.text) { simple.push(p.text); }
+					else if (p.link) {
+						simple.push(
+							config.link_template
+								.replace(find_link, p.element.href)
+								.replace(find_link_text, p.element.innerText)
+						);
+					}
+				}
+				else if (p.img) {
+					simple.push(
+						config.img_template
+							.replace(find_img, p.element.src)
+							.replace(find_img_alt, p.element.alt)
+					);
+				}
+				else if (p.br) {
+					simple.push(config.br);
+				}
+				else if (p.hr) {
+					simple.push(config.hr);
+				}
+			}
+	
+			close(config);
+	
+			return simple.join("");		
+		};
+
+		function close(config) {
+			if (bold) { simple.push(config.bold_end); bold = false; }
+			if (italic) { simple.push(config.italic_end); italic = false; }
+			
+			if (block) {
+				simple.push(block === "p"
+							? config.para_end : config.quote_end); 
+				block = "";
+			}
+		}
+
+		return render;
+	})();
+
+	var ignore_next_mutation = false;
+	new MutationObserver(function() {
+		if (ignore_next_mutation) {
+			ignore_next_mutation = false;
+			return;
+		}
+		else {
+			output.processing(true);
+		}
+		
+		parse.old = true; parse();
+
+		placeholder.style.display = 
+			(input.childNodes.length > 0) ? "none" : "block";
+	})
+	.observe(input, { subtree:true, childList:true, characterData:true });
+
+	var pasted = false;
+	input.onpaste = function() {
+		console.log("pasted");
+		pasted = true;
+	};
+	
+</script>
+
+
