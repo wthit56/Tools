@@ -32,6 +32,7 @@
 	}
 	#input img { max-width:100%; }
 	
+	
 	#right {
 		display:grid; font-size:120%;
 		grid-template-rows:3em 1fr;
@@ -51,6 +52,7 @@
 	#output.processing { opacity:0.5; }
 
 	.info-189279123 {
+		z-index:2;
 		overflow:hidden; position:absolute; top:0; right:0;
 		width:1em; height:1em; border-radius:0 0 0 5px;
 		background:#eee; box-shadow: 0 0 5px rgba(0,0,0,0.2);
@@ -192,19 +194,24 @@ rule:<hr/></textarea>
 				else if (c.nodeType === 1) {
 					// tag
 					var cstyle = window.getComputedStyle(c);
-
-					is_block = (/(?:^| )(?:block|list-item|table|table-row|inline-table|flex|grid)(?: |$)/.test(cstyle.display));
-
+					var s = {
+						bold: /^(?:bold|bolder|[7-9]00)$/.test(cstyle.fontWeight),
+						italic: /^(?:italic|oblique(?: .+))$/.test(cstyle.fontStyle),
+						underline: /(?:^|\S )underline( |$)/.test(cstyle.textDecoration)
+					};
+					
+					is_block = (/(?:^| )(?:block|list-item|table|table-row|inline-table|flex|grid)(?: |$)/.test(cstyle.display));					
+					
 					if (is_block) {
 						var last = parts[parts.length-1];
 						if (!last || !last.block) {
 						// if (c.parentNode === input) {
-							parts.push({ block:true, element:c });
+							parts.push({ block:true, element:c, style:s });
 						}
 					}
 
 					if (c.childNodes.length > 0) {
-						parse_elements(cstyle, c.childNodes, parts);
+						parse_elements(s, c.childNodes, parts);
 					}
 
 				}
@@ -381,7 +388,7 @@ rule:<hr/></textarea>
 					}
 				}
 				else if (p.text || p.link) {
-					if (/^(?:bold|bolder|[7-9]00)$/.test(p.style.fontWeight)) {
+					if (p.style.bold) {
 						if (!bold) {
 							simple.push(config.bold_start); bold = true;
 						}
@@ -390,7 +397,7 @@ rule:<hr/></textarea>
 						simple.push(config.bold_end); bold = false;
 					}
 					
-					if (/^(?:italic|oblique(?: .+))$/.test(p.style.fontStyle)) {
+					if (p.style.italic) {
 						if (!italic) {
 							simple.push(config.italic_start); italic = true;
 						}
@@ -399,7 +406,7 @@ rule:<hr/></textarea>
 						simple.push(config.italic_end); italic = false;
 					}
 
-					if (/(?:^|\S )underline( |$)/.test(p.style.textDecoration)) {
+					if (p.style.underline) {
 						if (!underline) {
 							simple.push(config.underline_start);
 							underline = true;
