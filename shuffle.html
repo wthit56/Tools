@@ -53,35 +53,40 @@
 	#card-sets { line-height:0; margin:1em; }
 
 	#drawn { display:none; }
-	.card { line-height:normal; }
-	.card.text { position:relative; background-color:white; color:black; }
+	.card { line-height:normal; position:relative; }
+	.card.text { background-color:white; color:black; }
 	.card.text > .content { position:absolute; top:50%; transform:translateY(-50%); left:5px; right:5px; max-height:100%; pointer-events:none; }
 
 	.card > .markers { position:absolute; z-index:2; pointer-events:none;
 		text-align:right; right:0; top:-0.5em; font-size:20px;
+		line-height:1em;
 	}
-	.card > .markers m { display:none;
-		background:white; border-radius:50%; color:black; }
-	.card > .markers.marker-0 m[m0] { display:inline; }
-	.card > .markers.marker-1 m[m1] { display:inline; }
-	.card > .markers.marker-2 m[m2] { display:inline; }
-	.card > .markers.marker-3 m[m3] { display:inline; }
-	.card > .markers.marker-4 m[m4] { display:inline; }
-	.card > .markers.marker-5 m[m5] { display:inline; }
-	.card > .markers.marker-6 m[m6] { display:inline; }
-	.card > .markers.marker-7 m[m7] { display:inline; }
-	.card > .markers.marker-8 m[m8] { display:inline; }
-	.card > .markers.marker-9 m[m9] { display:inline; }
-	.card m[m0]::before { content:"⓪"; }
-	.card m[m1]::before { content:"①"; }
-	.card m[m2]::before { content:"②"; }
-	.card m[m3]::before { content:"③"; }
-	.card m[m4]::before { content:"④"; }
-	.card m[m5]::before { content:"⑤"; }
-	.card m[m6]::before { content:"⑥"; }
-	.card m[m7]::before { content:"⑦"; }
-	.card m[m8]::before { content:"⑧"; }
-	.card m[m9]::before { content:"⑨"; }
+	.card > .markers m { display:none; }
+	.card > .markers m::before {
+		background:white; color:black;
+		min-width:1em; height:1em; display:inline-block;
+		padding:0.2em; border-radius:0.7em; text-align:center;
+	}
+	.card > .markers.marker-0 m[m0] { display:inline-block; }
+	.card > .markers.marker-1 m[m1] { display:inline-block; }
+	.card > .markers.marker-2 m[m2] { display:inline-block; }
+	.card > .markers.marker-3 m[m3] { display:inline-block; }
+	.card > .markers.marker-4 m[m4] { display:inline-block; }
+	.card > .markers.marker-5 m[m5] { display:inline-block; }
+	.card > .markers.marker-6 m[m6] { display:inline-block; }
+	.card > .markers.marker-7 m[m7] { display:inline-block; }
+	.card > .markers.marker-8 m[m8] { display:inline-block; }
+	.card > .markers.marker-9 m[m9] { display:inline-block; }
+	.card m[m0]::before { content:"0"; }
+	.card m[m1]::before { content:"1"; }
+	.card m[m2]::before { content:"2"; }
+	.card m[m3]::before { content:"3"; }
+	.card m[m4]::before { content:"4"; }
+	.card m[m5]::before { content:"5"; }
+	.card m[m6]::before { content:"6"; }
+	.card m[m7]::before { content:"7"; }
+	.card m[m8]::before { content:"8"; }
+	.card m[m9]::before { content:"9"; }
 	
 	.deck + .deck, .deck + .info { margin-left:1em; }
 
@@ -99,7 +104,7 @@
 			rgba(255,0,0,0.05) 50px,
 			transparent 50px,
 			transparent 100px
-			);
+		);
 	}
 
 	#card-sets[data-show-frame="0"] #shuffled { display:block; }
@@ -147,7 +152,7 @@
 <style id="card_styles_css"></style>
 
 <div id="status_display">Test</div>
-
+	
 <div id="prototype">
 	<span class="card" title="Click to discard">
 		<span class="markers"><m m0></m><m m1></m><m m2></m><m m3></m><m m4></m><m m5></m><m m6></m><m m7></m><m m8></m><m m9></m></span>
@@ -315,7 +320,7 @@ x6 2 7 4 8
 
 
 	document.addEventListener("keyup", function(e) {
-		console.log("document keyup while hovering", mousedover);
+		// console.log("document keyup while hovering", mousedover);
 		
 		if (e.shiftKey && mousedover.classList.contains("card")) { }
 		else { return; }
@@ -334,7 +339,7 @@ x6 2 7 4 8
 	var mousedover = null;
 	document.addEventListener("mouseover", function(e) {
 		mousedover = e.target;
-		console.log("mouseover", e.target);
+		// console.log("mouseover", e.target);
 	}, true);
 
 
@@ -410,7 +415,7 @@ x6 2 7 4 8
 	
 	edit_button.onclick = function() {
 		document.body.classList.add("edited");
-		if (MARKERS_SET) { alert("Warning: Markers have been set. Loading will reset markers."); }
+		load_button.innerText = MARKERS_SET ? "Reset Markers and Load" : "Load";
 		
 		src_input.value = decks.map(function(deck) {
 			if (deck.info) {
@@ -475,6 +480,7 @@ x6 2 7 4 8
 	var played = false;
 	function play() {
 		CSS = "";
+		MARKERS_SET = false;
 		
 		if (!played) {
 			played = true;
@@ -599,12 +605,13 @@ x6 2 7 4 8
 			if (deck_side) { error("Deck to the side, but no non-side before it."); return; }
 			if (info_side) { error("Info to the side, but no non-side before it."); return; }
 		}
+		
 		if (name) {
 			if (deck && !deck.info && !deck.img_url && !deck.local && !deck.text_cards) {
 				error("No image defined for deck.");
 				return;
 			}
-			decks.push(deck = { name: name });
+			decks.push(deck = { name: name, default_style: -1 });
 			deck.side = deck_side;
 			// subsequent text cards shouldn't use a style
 			// until a new style is defined within this deck
@@ -642,6 +649,9 @@ x6 2 7 4 8
 			else if (styles) {
 				card_styles.use = true;
 				card_styles.push(styles);
+				if (deck.default_style === -1) {
+					deck.default_style = card_styles.length - 1;
+				}
 			}
 			else if (key) {
 				deck[key] = value;
@@ -749,10 +759,8 @@ x6 2 7 4 8
 			deck.gwidth = 1; deck.gheight = 1;
 		}
 		
-		// css
-		// card.style.lineHeight = deck.cheight + "px";
-
 		card.style.zoom = deck.zoom;
+		card.querySelector(".markers").style.zoom = 1/deck.zoom;
 	
 		if (deck.text_cards) {
 			card.style.width = deck.cwidth + "px";
@@ -801,6 +809,10 @@ x6 2 7 4 8
 						 ${(-deck.margin.y + (-xy.y * deck.cheight))}px`;
 	
 					shuffled.appendChild(c);
+
+					if (deck.default_style) {
+						c.dataset.style = deck.default_style;
+					}
 					
 					for (var j = 1; j < q; j++) {
 						shuffled.appendChild(c.cloneNode(true));
@@ -978,7 +990,7 @@ x6 2 7 4 8
 		show_frame.value = 1;
 	
 		deck_shown.addEventListener("keyup", function(e) {
-			console.log("deck keyup");
+			// console.log("deck keyup");
 			e.preventDefault();
 			e.stopPropagation();
 			
