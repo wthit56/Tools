@@ -92,17 +92,21 @@
 		<div class="info-189279123">
 			<span>ℹ</span>
 			<div>
+				<p>Anything that's not one of the templates below is ignored.
+					Use <q>\n</q> to insert new lines.</p>
 				<p><strong>Block, quote, bold, italic, underline</strong>:
 					<q>before:type:after</q> will add the "before" and "after"
 					around that kind of content.</p>
-				<p><strong>Rule, newline</strong>:
-					<q>type:replace</q> will turn it into whatever is after the ":".</p>
+				<p><strong>Rule, newline, quote_newline</strong>:
+					<q>type:replace</q> will turn it into whatever is after the ":".
+					(Newlines in quotes will use the newline template 
+					unless quote_newline is defined.)
+				</p>
 				<p><strong>Image template, link template</strong>:
-					<q>&lt;img src=":img:" alt=":img_alt:" /></q> 
+					<q>&lt;img src=":img:" alt=":img_alt:" /></q>, 
+					<q>&lt;a href=":link:">:link_text:&lt;/a></q>
 					replaces the ":data:" parts with the relevant data,
 					and uses that in place of the content.</p>
-				<p>Anything that's not one of these templates is ignored.
-					Use <q>\n</q> to insert new lines.</p>
 			</div>
 		</div>
 		<textarea id="format" rows="10" cols="40">FORMATTING
@@ -249,11 +253,12 @@ rule:<hr/></textarea>
 			italic_start, italic_end,
 			img_template, 
 			hr, 
-			underline_start, underline_end;
+			underline_start, underline_end,
+			brq_t;
 
 		var find_nl = /\\n/g, nl = "\n";
 		
-		var parse_format = /^(?:((.*?):para:(.*))|((.*?):quote:(.*))|(newline:(.*))|((.*?):bold:(.*))|((.*?):italic:(.*))|(.*:img(?:_alt)?:.*)|(.*:link(?:_text)?.*)|(rule:(.*))|((.*):underline:(.*)))$/gm;
+		var parse_format = /^(?:((.*?):para:(.*))|((.*?):quote:(.*))|(newline:(.*))|((.*?):bold:(.*))|((.*?):italic:(.*))|(.*:img(?:_alt)?:.*)|(.*:link(?:_text)?.*)|(rule:(.*))|((.*):underline:(.*))|(quote_newline:(.*)))$/gm;
 		function process_format(
 			m,
 			_para, _para_start, _para_end,
@@ -263,7 +268,8 @@ rule:<hr/></textarea>
 			_italic, _italic_start, _italic_end,
 			_img_template, _link_template,
 			_hr, _hr_t,
-			_underline, _underline_start, _underline_end
+			_underline, _underline_start, _underline_end,
+			_quote_newline, _brq_t
 		) {
 			if (_para) {
 				para_start = _para_start.replace(find_nl, nl);
@@ -297,6 +303,10 @@ rule:<hr/></textarea>
 				underline_start = _underline_start.replace(find_nl, nl);
 				underline_end = _underline_end.replace(find_nl, nl);
 			}
+			else if (_quote_newline) {
+				use_brq = true;
+				brq_t = _brq_t.replace(find_nl, nl);
+			}
 		}
 		
 		return function format_parse(src) {
@@ -307,7 +317,10 @@ rule:<hr/></textarea>
 			italic_start = italic_end =
 			underline_start = underline_end =
 			img_template = 
-			hr = "";
+			hr = 
+			brq = "";
+
+			use_brq = false;
 
 			link_template = ":link_text:";
 
@@ -322,7 +335,8 @@ rule:<hr/></textarea>
 				img_template, 
 				link_template, 
 				hr,
-				underline_start, underline_end
+				underline_start, underline_end,
+				use_brq, brq: brq_t
 			};		
 		};
 	})();
@@ -338,7 +352,8 @@ rule:<hr/></textarea>
 			italic_start, italic_end,
 			img_template, 
 			link_template, 
-			hr;
+			hr,
+			use_brq, brq;
 			
 		var config;
 		
@@ -364,7 +379,7 @@ rule:<hr/></textarea>
 
 	var render = (function() {
 		var simple = [],
-			block = "",
+			block = "", recent_newline = false,
 			bold = false, italic = false, underline = false;
 
 		var find_img = /:img:/g, find_img_alt = /:img_alt:/g;
@@ -375,6 +390,9 @@ rule:<hr/></textarea>
 			simple.length = 0;
 			for (var i = 0; i < parse.parts.length; i++) {
 				var p = parse.parts[i];
+				
+				if (!p.br) { recent_newline = false; }
+				
 				if (p.block) {
 					close(config);
 					var n = parse.parts[i+1];
@@ -434,7 +452,16 @@ rule:<hr/></textarea>
 					);
 				}
 				else if (p.br) {
-					simple.push(config.br);
+					if (!recent_newline) {
+						if (block === "blockquote" && config.use_brq) {
+							simple.push(config.brq);
+						}
+						else {
+							simple.push(config.br);
+						}
+					}
+
+					recent_newline = true;
 				}
 				else if (p.hr) {
 					simple.push(config.hr);
