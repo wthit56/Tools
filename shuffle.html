@@ -387,7 +387,7 @@ x6 2 7 4 8
 			}
 			else { discarded_state = "?"; }
 
-			return `\nstate: ${shuffled_state}|${drawn_state}|${discarded_state}`;
+			return `state: ${shuffled_state}|${drawn_state}|${discarded_state}`;
 		}
 		else {
 			return "";
@@ -416,6 +416,24 @@ x6 2 7 4 8
 	edit_button.onclick = function() {
 		document.body.classList.add("edited");
 		load_button.innerText = MARKERS_SET ? "Reset Markers and Load" : "Load";
+
+		var new_src = [], sofar = 0;
+		for (var i = 0; i < decks.length; i++) {
+			var d = decks[i];
+			new_src.push(
+				SRC_CACHE.slice(sofar, d.state_start),
+				"\n" + generate_state(d.shown)
+			);
+			sofar = d.state_end;
+		}
+		if (sofar < SRC_CACHE.length) {
+			new_src.push(SRC_CACHE.slice(sofar));
+		}
+		console.log(new_src);
+		src_input.value = new_src.join("");
+		
+		show_src(true);
+		return;
 		
 		src_input.value = decks.map(function(deck) {
 			if (deck.info) {
@@ -478,6 +496,7 @@ x6 2 7 4 8
 	};
 
 	var played = false;
+	var SRC_CACHE;
 	function play() {
 		CSS = "";
 		MARKERS_SET = false;
@@ -503,9 +522,15 @@ x6 2 7 4 8
 			}
 		}
 
+
+		// PARSING
+		// -setup
 		card_styles.use = false;
 		card_styles.length = 0;
+		// -parse
+		SRC_CACHE = src_input.value;
 		src_input.value.replace(scan_src, parse_src);
+		// -errors
 		if (decks.length === 0) { error("Found no decks."); }
 		if (errors.report()) { return; }
 
@@ -591,13 +616,15 @@ x6 2 7 4 8
 	}
 	
 	var scan_src = /^\#(<)?[ \t]*(\S.*)$|^x((?:\d+[ \t]*)+)$|^((?:file|https?):.+)$|^(\d+)x[ \t]+(.+)$|^\.(<)?[ \t]*(.+)$|^(\$.*)$|^(\w+):[ \t]*(.+)$/gm;
-	function parse_src(m,
+	function parse_src(
+		m,
 		deck_side, name,
 		quantities, url,
 		text_quantity, text,
 		info_side, info,
 		styles,
-		key, value
+		key, value,
+		__offset, __string
 	) {
 		if (errors.length > 0) { return; }
 
@@ -616,6 +643,10 @@ x6 2 7 4 8
 			// subsequent text cards shouldn't use a style
 			// until a new style is defined within this deck
 			card_styles.use = false;
+
+			deck.state_start = __offset + m.length;
+			deck.state_end = deck.state_start;
+			console.log("new state point", deck.name, [__string[deck.state_start]])
 		}
 		else if (info) {
 			decks.push(deck = { info: info });
@@ -655,6 +686,12 @@ x6 2 7 4 8
 			}
 			else if (key) {
 				deck[key] = value;
+
+				if (key === "state") {
+					deck.state_start = __offset - 1;
+					deck.state_end = __offset + m.length;
+					console.log("existing state", deck.name, [__string[deck.state_end]]);
+				}
 			}
 		}
 	}
