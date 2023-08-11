@@ -433,52 +433,6 @@ x6 2 7 4 8
 		src_input.value = new_src.join("");
 		
 		show_src(true);
-		return;
-		
-		src_input.value = decks.map(function(deck) {
-			if (deck.info) {
-				return "." + (deck.side ? "<" : "") + " " + deck.html.value.replace(/\r?\n/g, "\\n");
-			}
-			else {
-				return (
-					"#" + (deck.side ? "<" : "") + " " +
-					(deck.name) +
-					(
-						deck.local ? "\nlocal: "+deck.local
-						: deck.img_url ? "\n" + deck.img_url
-						: ""
-					) +
-					(
-						deck.grid ? "\ngrid: " + deck.grid
-							: deck.px ? "\npx: " + deck.px
-							: ""
-					) +
-					(
-						deck.zoom !== 1 ? "\nzoom: " + deck.zoom : ""
-					) +
-					(
-						(deck.margin.x || deck.margin.y)
-							? "\nmargin: " + (
-								deck.margin.x === deck.margin.y
-									? deck.margin.x
-									: deck.margin.x + " " + deck.margin.y
-							)
-							: ""
-					) +
-					(
-						deck.quantities ? "\nx" + deck.quantities.join(" ") : "" 
-					) +
-					(
-						deck.text_cards ? regen_text_cards(deck.text_cards) : ""
-					) +
-					(
-						generate_state(deck.shown)
-					)
-				);
-			}
-		}).join("\n\n");
-
-		show_src(true);
 	};
 
 	bg_brightness.oninput = function() {
@@ -1127,7 +1081,10 @@ x6 2 7 4 8
 	</p>
 	
 	<h2 id="codes">Codes</h2>
-	<p>The source text works as follows:</p>
+	<p>Each line of the source text is read.
+		If it doesn't look like a rule, it is ignored.
+		If it does look like a rule, as below, it has its
+		designated effect on the deck being constructed:</p>
 	<p><q>. Notes</q>: An editable note that is displayed 
 		between decks.
 		While playing, notes can be edited during the game,
