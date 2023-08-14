@@ -420,16 +420,25 @@ x6 2 7 4 8
 		var new_src = [], sofar = 0;
 		for (var i = 0; i < decks.length; i++) {
 			var d = decks[i];
-			new_src.push(
-				SRC_CACHE.slice(sofar, d.state_start),
-				"\n" + generate_state(d.shown)
-			);
-			sofar = d.state_end;
+			if (d.state_start) {
+				new_src.push(
+					SRC_CACHE.slice(sofar, d.state_start),
+					"\n" + generate_state(d.shown)
+				);
+				sofar = d.state_end;
+			}
+			else if (d.info) {
+				new_src.push(
+					SRC_CACHE.slice(sofar, d.info_start),
+					d.html.value.replace(/\n/g, "\\n")
+				)
+				sofar = d.info_end;
+			}
 		}
 		if (sofar < SRC_CACHE.length) {
 			new_src.push(SRC_CACHE.slice(sofar));
 		}
-		console.log(new_src);
+		// console.log(new_src);
 		src_input.value = new_src.join("");
 		
 		show_src(true);
@@ -569,13 +578,13 @@ x6 2 7 4 8
 		CSS += css;
 	}
 	
-	var scan_src = /^\#(<)?[ \t]*(\S.*)$|^x((?:\d+[ \t]*)+)$|^((?:file|https?):.+)$|^(\d+)x[ \t]+(.+)$|^\.(<)?[ \t]*(.+)$|^(\$.*)$|^(\w+):[ \t]*(.+)$/gm;
+	var scan_src = /^\#(<)?[ \t]*(\S.*)$|^x((?:\d+[ \t]*)+)$|^((?:file|https?):.+)$|^(\d+)x[ \t]+(.+)$|^(\.(<)?[ \t]*)(.+)$|^(\$.*)$|^(\w+):[ \t]*(.+)$/gm;
 	function parse_src(
 		m,
 		deck_side, name,
 		quantities, url,
 		text_quantity, text,
-		info_side, info,
+		info_pre, info_side, info,
 		styles,
 		key, value,
 		__offset, __string
@@ -600,10 +609,14 @@ x6 2 7 4 8
 
 			deck.state_start = __offset + m.length;
 			deck.state_end = deck.state_start;
-			console.log("new state point", deck.name, [__string[deck.state_start]])
+			// console.log("new state point", deck.name, [__string[deck.state_start]])
 		}
 		else if (info) {
-			decks.push(deck = { info: info });
+			decks.push(deck = {
+				info: info,
+				info_start: __offset + info_pre.length,
+				info_end: __offset + m.length
+			});
 			deck.side = info_side;
 		}
 		else {
@@ -644,7 +657,7 @@ x6 2 7 4 8
 				if (key === "state") {
 					deck.state_start = __offset - 1;
 					deck.state_end = __offset + m.length;
-					console.log("existing state", deck.name, [__string[deck.state_end]]);
+					// console.log("existing state", deck.name, [__string[deck.state_end]]);
 				}
 			}
 		}
@@ -660,16 +673,16 @@ x6 2 7 4 8
 			decks_row.className = "row";
 		}
 
-		
-		if (deck.info) { // info
+		if (deck.info) {
 			var info = decks_row.appendChild(document.createElement("textarea"));
 			info.className = "info";
-			info.innerHTML = deck.info.replace(/\\n/g, "\n");
+			var lines = deck.info.split("\\n");
+			info.innerHTML = lines.join("\n");
 			deck.html = info;
+			info.rows = lines.length;
 			return;
 		}
 
-		
 		if (errors.report()) { return; }
 		
 		if (!("zoom" in deck)) { deck.zoom = 1; }
