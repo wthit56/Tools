@@ -839,7 +839,7 @@ x6 2 7 4 8
 					var c = card.cloneNode(true);
 					var content = c.appendChild(document.createElement("div"));
 					content.className = "content";
-					content.innerHTML = t.content;
+					content.innerHTML = t.content.replace(/\\n/g, "\n");
 
 					c.dataset.index = offset + i;
 					if (t.style_id !== -1) {
@@ -1137,10 +1137,11 @@ x6 2 7 4 8
 		<q>$ { background:red; }</q>:
 		<a href="https://developer.mozilla.org/en-US/docs/Web/CSS" target="_blank"">CSS styles</a>
 		applied to all following cards within this deck
-		until another style line is found.
-		This is for more advanced deck creators,
+		until another style line is found. The first set of styles
+		are used for any image cards, also.
+		<em>This is for more advanced deck creators,
 		lets you break things, but lets you have much more complex 
-		text cards.
+		text cards.</em>
 	</p>
 	<p>
 		A style consists of a selector and a declaration.
@@ -1177,6 +1178,7 @@ x6 2 7 4 8
 		<em>Search <a href="https://symbl.cc/" target="_blank">Symbl</a> 
 		or <a href="https://emojidb.org/" target="_blank">EmojiDB</a>
 		to find emoji to use for your cards.</em>
+		And <q>\n</q> is converted into new lines, in case you need that.
 	</p>
 	<p>These can also include 
 		<a href="https://developer.mozilla.org/en-US/docs/Web/HTML" target="_blank"">HTML tags</a>.
