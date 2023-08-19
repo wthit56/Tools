@@ -3,8 +3,8 @@
 <title>Shuffle | virtual card decks for flip n' write board games</title>
 <body>
 <style type="text/css">
-	a { color:black; font-weight:bold; }
-	body.dark a { color:white; }
+	#explanation a { color:black; }
+	body.dark #explanation a { color:white; }
 	
 	#status_display { 
 		display:none; color:black;
@@ -194,7 +194,16 @@
 	<div id="decks_shown"></div>
 </div>
 <div class="edit_mode">
-	<textarea id="src_input" rows=10 cols=50></textarea>
+	<textarea id="src_input" rows=10 cols=50>
+# Test
+state: ?|0b 1a 0a|-
+$a { background:red; } $b { background:green; }
+random: 1 1
+1x !
+1x "
+1x £
+1x $		
+	</textarea>
 	<br/>
 	<span class="fresh"><button id="play_button">Play</button></span>
 	<span class="from_edit">
@@ -207,60 +216,6 @@
 		Clear and re-select to reload changed images.</em></p>
 </div>
 
-
-<!--
-#Die
-px: 100x100
-font:90px Arial
-zoom:2
-1x 1
-1x 2
-1x 3
-1x 4
-1x 5
-1x 6
-state: -|*|-
--->
-<!--
-# Helvetica Playing Cards
-http://3.bp.blogspot.com/_w_0zEaXF8y8/TT3-sC0g6KI/AAAAAAAAAC0/ff4xXts7bfw/s1600/grid.jpg
-grid: 8x7
-margin: 38
-zoom: 1.2
-x0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0
--->
-
-<!--
-# Aces
-http://127.0.0.1:8887/English_pattern_playing_cards_deck.svg.png
-grid:13x4
-x1 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 1 0
-state:|0 1 2 3|
-
-# 2s
-http://127.0.0.1:8887/English_pattern_playing_cards_deck.svg.png
-grid:13x4
-x0 1 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 1 0
-state:|0 1 2 3|
--->
-		
-<!--
-# TOT: Letters Setup
-https://i.imgur.com/YMqN1nf.jpg
-grid:1x13
-zoom:0.3
-
-# TOT: Sights Setup
-https://i.imgur.com/DfBm3o1.png
-grid:5x1
-zoom:0.3
-
-# TOT: Terrain
-https://i.imgur.com/CVdaynk.png
-grid:5x1
-zoom:0.3
-x6 2 7 4 8
--->
 
 
 <style id="card_style" type="text/css"></style>
@@ -314,8 +269,10 @@ x6 2 7 4 8
 		return out;
 	}
 
-	function indices_of(nodes) {
-		return [...nodes].map(function(c) { return c.dataset.index; });
+	function indices_of(deck, nodes) {
+		return [...nodes].map(function(c) {
+			return c.dataset.index + (c.dataset.random||"");
+		});
 	}
 
 
@@ -358,7 +315,7 @@ x6 2 7 4 8
 	}
 	show_src(true);
 
-	function generate_state(deck) {
+	function generate_state(deck, deck_meta) {
 		var shuffled = deck.shuffled.childNodes.length,
 			drawn = deck.drawn.childNodes.length,
 			discarded = deck.discarded.childNodes.length;
@@ -368,22 +325,22 @@ x6 2 7 4 8
 			if (!shuffled) { shuffled_state = "-"; }
 			// else if (!drawn && !discarded) { shuffled_state = "*"; }
 			else if (shuffled < discarded) {
-				shuffled_state = indices_of(deck.shuffled.childNodes).join(" ");
+				shuffled_state = indices_of(deck, deck.shuffled.childNodes).join(" ");
 			}
 			else { shuffled_state = "?"; }
 
 			var drawn_state;
 			if (!drawn) { drawn_state = "-"; }
-			else if (!shuffled && !discarded) { drawn_state = "*"; }
+			else if (!shuffled && !discarded && !deck_meta.random) { drawn_state = "*"; }
 			else {
-				drawn_state = indices_of(deck.drawn.childNodes).join(" ");
+				drawn_state = indices_of(deck, deck.drawn.childNodes).join(" ");
 			}
 
 			var discarded_state;
 			if (!discarded) { discarded_state = "-"; }
-			else if (!shuffled && !drawn) { discarded_state = "*"; }
+			else if (!shuffled && !drawn && !deck_meta.random) { discarded_state = "*"; }
 			else if (discarded <= shuffled) {
-				discarded_state = indices_of(deck.discarded.childNodes).join(" ");
+				discarded_state = indices_of(deck, deck.discarded.childNodes).join(" ");
 			}
 			else { discarded_state = "?"; }
 
@@ -394,7 +351,7 @@ x6 2 7 4 8
 		}
 	}
 
-	function regen_text_cards(cards) {
+	/*function regen_text_cards(cards) {
 		var f = undefined;
 		var s = -1;
 		var out = "";
@@ -411,7 +368,7 @@ x6 2 7 4 8
 			out += `\n${c.quantity}x ${c.content}`
 		}
 		return out;
-	}
+	}*/
 	
 	edit_button.onclick = function() {
 		document.body.classList.add("edited");
@@ -421,9 +378,10 @@ x6 2 7 4 8
 		for (var i = 0; i < decks.length; i++) {
 			var d = decks[i];
 			if (d.state_start) {
+				var s = generate_state(d.shown, d);
 				new_src.push(
 					SRC_CACHE.slice(sofar, d.state_start),
-					"\n" + generate_state(d.shown)
+					(s && "\n") + s
 				);
 				sofar = d.state_end;
 			}
@@ -560,15 +518,16 @@ x6 2 7 4 8
 	card_styles.setup = function() {
 		var css = "";
 		for (var i = 0; i < card_styles.length; i++) {
-			var s = ` .deck #card-sets .card[data-style="${i}"] `;
+			var s = ` .deck #card-sets .card[data-style="${i}"]`;
 			var styles = card_styles[i].replace(/(.*?)(\{[^}]*\})/g, function(m,
 				selector, style
 			) {
 				return (
 					selector
 						.replace(/\$(\d)/g, s + " > .markers m[m$1]::before")
-						.replace(/\$(?=\s+[^\{])/g, s + " .content ")
-						.replace(/\$(?=[\s\{])/g, s) +
+						.replace(/\$([a-z])/g, s + `[data-random="$1"]`)
+						.replace(/\$(?=[\s\{])/g, s)
+						.replace(/\s\.content\w/, " .content $&")+
 					style +
 					"\n"
 				);
@@ -715,6 +674,7 @@ x6 2 7 4 8
 		var shuffled = deck_shown.shuffled =
 			deck_shown.querySelector("#shuffled");
 		var shuffled_cards = shuffled.childNodes;
+		shuffled.deck = deck;
 		
 		var drawn = deck_shown.drawn =
 			deck_shown.querySelector("#drawn");
@@ -789,7 +749,28 @@ x6 2 7 4 8
 			deck.quantities = deck.quantities.split(" ").map(to_number);
 		}
 
-		
+		if (deck.random) {
+			var r_total = 0;
+			deck.random = deck.random.split(" ");
+			deck.random.forEach(function(v, i, a) {
+				v = parseInt(v);
+				r_total += v;
+				a[i] = v;
+			});
+			var sofar = 0, _ifs = [];
+			var tags = "abcdefghijklmnopqrstuvwxyz";
+			deck.random.forEach(function(v,i,a) {
+				var f = v/r_total;
+				sofar += f;
+				a[i] = sofar;
+				_ifs.push(`${i>0 ? "else ":""}if (r <= ${sofar}) { return "${tags[i]}"; }`);
+			});
+			deck.random.get_tag = new Function(`
+				var r = Math.random();
+				${_ifs.join("\n")}
+			`);
+		}
+
 		var i = 0;
 		if (deck.img) {
 			for (; i < deck.gwidth * deck.gheight; i++) {
@@ -807,11 +788,12 @@ x6 2 7 4 8
 					var xy = index_to_x_y(deck, i, adding_x_y);
 					var c = deck.card_prototype.cloneNode(true);
 					c.dataset.index = i;
+					c.base_className = c.className;
 					
 					c.style.backgroundPosition =
 						`${(-deck.margin.x + (-xy.x * deck.cwidth))}px
 						 ${(-deck.margin.y + (-xy.y * deck.cheight))}px`;
-	
+
 					shuffled.appendChild(c);
 
 					if (deck.default_style) {
@@ -830,13 +812,14 @@ x6 2 7 4 8
 		if (deck.text_cards) {
 			var offset = i;
 			card.style.backgroundImage = "";
-			card.className = "card text";
+			card.className = card.base_className = "card text";
 			for (i = 0; i < deck.text_cards.length; i++) {
 				var t = deck.text_cards[i];
 				var q = t.quantity;
 	
 				if (q > 0) {
 					var c = card.cloneNode(true);
+					
 					var content = c.appendChild(document.createElement("div"));
 					content.className = "content";
 					content.innerHTML = t.content.replace(/\\n/g, "\n");
@@ -847,10 +830,13 @@ x6 2 7 4 8
 					}
 					c.style.font = t.font;
 
+					c.base_className = card.base_className;
 					shuffled.appendChild(c);
 				
 					for (var j = 1; j < q; j++) {
-						shuffled.appendChild(c.cloneNode(true));
+						var copy = c.cloneNode(true);
+						copy.base_className = card.base_className;
+						shuffled.appendChild(copy);
 					}
 				}
 			}
@@ -871,7 +857,7 @@ x6 2 7 4 8
 				case "*": case "?": case "-": break;
 				default: 
 					move_all(shuffled, discarded);
-					move_all_indices(s[0].match(find_integers), discarded, shuffled);
+					move_all_indices(s[0].match(find_indices), discarded, shuffled);
 			}
 
 			switch(s[1]) { // drawn state
@@ -879,7 +865,7 @@ x6 2 7 4 8
 				case "*": move_all(shuffled, drawn); break;
 				default:
 					// from deck_shown (from any pile)
-					move_all_indices(s[1].match(find_integers), deck_shown, drawn);
+					move_all_indices(s[1].match(find_indices), deck_shown, drawn);
 			}
 
 			switch(s[2]) { // discarded state
@@ -939,11 +925,18 @@ x6 2 7 4 8
 			else { // buttons
 				switch (e.target.id) {
 					case "draw_button":
-						drawn.appendChild(shuffled_cards[shuffled_cards.length * Math.random() | 0]);
+						var c = shuffled_cards[shuffled_cards.length * Math.random() | 0];
+						if (deck.random) { c.dataset.random = deck.random.get_tag(); }
+						drawn.appendChild(c);
 						show_frame.value = FRAME_DRAWN;
 						break;
 
 					case "draw_all_button":
+						if (deck.random) {
+							[...shuffled.childNodes].forEach(function(c) {
+								c.dataset.random = deck.random.get_tag();
+							});
+						}
 						move_all(shuffled, drawn);
 						show_frame.value = FRAME_DRAWN;
 						break;
@@ -999,9 +992,11 @@ x6 2 7 4 8
 			e.stopPropagation();
 			
 			switch(e.key) {
-				case "Tab":
-					show_frame.value++;
-					deck_shown.focus();
+				case "v":
+					if (!e.ctrlKey) {
+						show_frame.value++;
+						deck_shown.focus();
+					}
 					break;
 	
 				case "1": case "2": case "3": case "4": case "5":
@@ -1034,15 +1029,24 @@ x6 2 7 4 8
 		return false;
 	}
 
+	// function 
+
 	function move_all(from, to) {
 		while (from.childNodes.length > 0) {
 			to.appendChild(from.childNodes[0]);
 		}
 	}
+
+	var find_indices = /\d+[a-z]?/g;
+	var parse_index = /^(\d+)([a-z])?$/;
 	function move_all_indices(indices, from, to) {
 		for (var i = 0; i < indices.length; i++) {
-			var c = from.querySelector(`.card[data-index="${indices[i]}"]`);
-			if (c) { to.appendChild(c); }
+			var m = indices[i].match(parse_index);
+			var c = from.querySelector(`.card[data-index="${m[1]}"]`);
+			if (c) {
+				if (m[2]) { c.dataset.random = m[2]; }
+				to.appendChild(c);
+			}
 			else { console.error(`Could not find card with index ${indices[i]}`); }
 		}
 	}
@@ -1133,6 +1137,16 @@ x6 2 7 4 8
 		If there are more cards in the image that quantities in the list,
 		the last quantity will be used for the rest of the cards.
 	</p>
+	<p id="random-ref">
+		<q>random: 1 1 2</q> Up to 26 integers, each defining the weighted 
+		probability of that tag being applied.
+		So in the example, <q>A</q> has a 1/4 chance of being chosen.
+		<q>B</q> has a 1/4 chance.
+		And <q>C</q> has a 2/4 chance.
+		These tags can be used to style the card differently.
+	</p>
+	<p><em>Note, the tags are applied when drawn 
+		from the shuffled deck.</em></p>
 	<p id="style-ref">
 		<q>$ { background:red; }</q>:
 		<a href="https://developer.mozilla.org/en-US/docs/Web/CSS" target="_blank"">CSS styles</a>
@@ -1162,6 +1176,10 @@ x6 2 7 4 8
 	<p>
 		Use <q>$0 { content:"😊"; }</q> to change the 0 maker to 😊.
 		<q>$6 { content: "😆"; }</q> changes the 6 maker, etc.
+	</p>
+	<p>
+		Use <q>$a</q> ... <q>$z</q> to style cards only when they 
+		have the 1st - 26th <a href="#random-ref">randomiser</a> tag applied.
 	</p>
 	<p><q>font:20px Arial</q>: the font to use for subsequent text cards
 		within this deck.
@@ -1214,7 +1232,7 @@ x6 2 7 4 8
 	</p>
 	<p>Click a deck or anything within the deck to "focus" on it.
 		While focussed on a deck, you can control it with keyboard shortcuts:</p>
-	<p><q>Tab</q> cycles through viewing 
+	<p><q>V</q> cycles through viewing 
 		the drawn, discarded, and shuffled cards.</p>
 	<p><q>1 - 9</q> draws that many cards from the shuffled pile.</p>
 	<p><q>0</q> discards all drawn cards.</p>
@@ -1225,30 +1243,3 @@ x6 2 7 4 8
 		but can be changed using a "<a href="#style-ref">style</a>" line.
 	</p>
 </div>
-
-	<!--
-
-# Prestige Buildings
-px: 300x200
-zoom: 0.7
-font:18px Arial
-$ l { width:140px; float:left; } $ txt { float:right; width:150px; } $ b { display:block; }
-1x <l><big>🗿</big><b>Monument</b>🪨🪨🪨</l><txt>2⭐x unused 🪨<br/>+4⭐
-1x <l><big>🔥</big><b>Pyre</b>🪵🪵🪵</l><txt>2⭐x unused 🪵<br/>+4⭐
-1x <l><big>🍴</big><b>Feast</b>🐟🐟🐟</l><txt>Find the 🏠 farthest away.<br/>2⭐x as many 🏠 are that far away
-1x <l><big>🛞</big><b>Cartwright</b>🪨🪵🪵</l><txt>2⭐x 🏠 in one direction from building
-1x <l><big>🏛</big><b>Great Hall</b>🪨🪨🪵</l><txt>⭐x 🏠 in range 2
-1x <l><big>🏡</big><b>Townhouse</b>🪨🐟🐟</l><txt>2⭐x open buildings at range 2
-1x <l><big>🕳️</big><b>Well</b>🪨🪨🐟</l><txt>⭐x distance to closest 🌊
-1x <l><big>⛵</big><b>Shipyard</b>🪵🐟🐟</l><txt>⭐x near + connected 🌊<br/>+2⭐
-1x <l><big>🛏</big><b>Inn</b>🪵🪵🐟</l><txt>2⭐x near empty spaces
-1x <l><big>🪙</big><b>Market</b>🪨🪵🐟</l><txt>3⭐x set of unused resources 🪵🪨🐟 in range 3
-1x <l><big>🗺</big><b>Map Maker</b>🪵🪵✱</l><txt>⭐x <med>○</med>/<med>●</med> in range 3
-1x <l><big>🌉</big><b>Bridge</b>🪨🪨✱</l><txt>Opposite sides must non-🌊.<br/>4⭐x near water
-1x <l><big>🍻</big><b>Pub</b>🪨🪵✱</l><txt>2⭐x unused 🐟
-1x <l><big>📦</big><b>Distributor</b>🐟🐟✱</l><txt>⭐x near shops x <med>○</med> in range 2
-1x <l><big>🍞</big><b>Baker</b>🪨🐟✱</l><txt>⭐x near 🏠 x 🎣 in range 2
-1x <l><big>📚</big><b>School</b>🪵🐟✱</l><txt>⭐x near 🏠 x 🌳 in range 2
-state: -|*|-
-
-	-->
