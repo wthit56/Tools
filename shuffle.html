@@ -194,16 +194,7 @@
 	<div id="decks_shown"></div>
 </div>
 <div class="edit_mode">
-	<textarea id="src_input" rows=10 cols=50>
-# Test
-state: ?|0b 1a 0a|-
-$a { background:red; } $b { background:green; }
-random: 1 1
-1x !
-1x "
-1x £
-1x $		
-	</textarea>
+	<textarea id="src_input" rows=10 cols=50></textarea>
 	<br/>
 	<span class="fresh"><button id="play_button">Play</button></span>
 	<span class="from_edit">
@@ -796,7 +787,7 @@ random: 1 1
 
 					shuffled.appendChild(c);
 
-					if (deck.default_style) {
+					if (deck.default_style !== -1) {
 						c.dataset.style = deck.default_style;
 					}
 					
