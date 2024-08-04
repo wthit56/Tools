@@ -1,0 +1,135 @@
+<head><link rel="icon" href="data:base64,iVBORwOKGO=" />
+<style>
+	body { line-height:1.4em; white-space:pre-line; font-family:monospace; font-size:20px; }
+	div { margin-bottom:1em; }
+	span { white-space:pre; display:inline-block; }
+</style>
+</head>
+<body><script>
+	TEST_compile_string = function(compile_string) {
+		console.time("Compiling strings");
+		
+		var lines = [
+			"",
+			"text only",
+			"\\[not code] \\\\\\[not code]",
+			"\\{not|code} \\\\\\{not|options}",
+			"---",
+			"['code only', (function(){ with ('curly braces') { 'and code'; } })()]",
+			"text with [code] and text ` backtick and ${fake-template-code|0} \\\\[more_code]",
+			"---",
+			"{just|options|only}",
+			"{just|options|with [code]}",
+			"{options|['code only']}",
+			"{options|\\['not code']}",
+			"\\{options|['not code']}",
+			"\\\\{options|['not code']}",
+			"{just|options|with {another|layer} }",
+			"_lists0{a|b}",
+			"{option1|option2\\\\}",
+			"---",
+			"{a|b}{c|d}",
+			"[code][code2]",
+			"---",
+			"\\{no|options|here}",
+			"{options|here} \\{no|options|here}",
+			"---",
+			"text [code, 'with', 'end'] text",
+			"text [code['with'], 'square'['brackets'['inside']], 'and inside\\n\\' [ string'] text",
+			"text {option1|option2} kdjfh } | text",
+			"text [1?'blah':''] {opt[code]ion1  {nes[code]ted1|nested2} \\{1--actually part of the previous optino|2 part of the next option} that still ended the options! |<-- does nothing! also does nothing! -->}",
+			"text^1",
+			"{option1^1|option2^2}",
+			"---",
+			"text^5",
+			"text^false",
+			"text^0b10010011  ",
+			"text^[code]",
+			"{text^[code]|option2}",
+			"text^[code]  ",
+			"{option1^[code]   |option2}",
+			"[code]^4",
+			"{option|s}^4",
+			
+			"#Errors",
+			"text \n text", // error: newline found
+			"---",
+			"text \\[non-code] [\"]code with no end", // error: no string close
+			"text \\[non-code] [\']code with no end", // error: no string close
+			"text [if(1){'blah'}] text", // error: non-expression code
+			"text [1?'blah'] text", // error: non-expression code
+			"---",
+			//* check for ${} within `string`?
+			"text \\[non-code] [\`]code with no end", // error: no string close
+			"text \\[non-code] [code with no end", // error: no ]
+			"text {option}", // error: no |
+			"text {option\\|}", // error: no unescaped |
+			"text {option", // no |
+			"text {option|", // no }
+			"text {option|\\}", // no unescaped }
+			"---",
+			"text^[code]text['more'+'code']", // error: more text found after top-level odds code
+			"{text^[code]text[more_code]|text}", // error: odds code didn't end the option
+			"text^[code]text", // error: text found after top-level odds
+			
+		].map(function(string) {
+			if (string === "---") { return { HR:true }; }
+			if (string.startsWith("#")) { return { heading:string.substr(1) }; }
+			else {
+				var code, compile_success = false, error;
+				try {
+					code = compile_string(string, { test_values:true, allow_odds:true });
+					compile_success = true;
+					perchance.build_js(code);
+				}
+				catch(e) { error = e; }
+
+				if (!(code instanceof String)) { code = new String(code); }
+				code.compiled = compile_success;
+				code.source = string;
+				code.error = error;
+				
+				return code;
+			}
+		});
+		console.timeEnd("Compiling strings");
+
+		lines.forEach(function(line) {
+			if (line.HR) {
+				document.body.appendChild(document.createElement("hr"));
+			}
+			else if (line.heading) {
+				document.body.appendChild(document.createElement("h1"))
+					.innerText = line.heading;
+			}
+			else {
+				var code = line.toString();
+				document.body.appendChild(document.createElement("div")).innerHTML = (
+					"<span>  " + (line.source ? line.source.replaceAll("\n", "⮐") : "<em>empty string</em>" ) + "</span>\n" +
+					"<span>=>" + (line.compiled
+						? code
+							.replaceAll("\n", "⮐")
+							.split(/(?<=\[|, )(?=P\.options_list\()|(?=\breturn P\.)|(?=return (?!.*? return))/g)
+							.map(l => "<span>"+l+"</span>")
+							.join("")
+						:  "<em>compilation failed</em>") +
+					"</span>" +
+					(line.odds_code ? "<span> ^"+line.odds_code+"</span>" : "") +
+					(line.error
+						 ? "\n<span style='color:red'>!!" + line.error.message + "</span>" +
+							 (line.error.data ? "\n"+line.error.data.map(i=>"<span>"+JSON.stringify(i)+"</span>").join("\n") : "")
+						 : ""
+					)
+				);
+			}
+		});
+
+
+		
+		
+	};
+
+
+
+	
+</script><script src="perchance.js"></script>

@@ -1,0 +1,312 @@
+<!doctype html>
+<head><meta charset="UTF-8" /></head>
+<body>
+<div id="line_bg">&nbsp;</div>
+<div id="proxy"></div>
+<!--textarea id="input">
+inline_fn()=> /* */ code // end comment
+multiline_fn()=>
+	code /* */
+	// end comment
+
+f()=>
+	// not end comment
+	code
+
+0digitstartingfnname()=>code
+
+no_fn\()=>code
+no_fn(\)=>code
+no_fn()\=>code
+no_fn()=\>code
+
+unusable fn name ()=> code
+fn spacing ( ) => code
+fn wrong arrow()= > code
+
+option with ["code"].
+option with {inline|options}.
+
+list
+  child1=true
+  child2
+
+    child2-1
+    child2-2
+      child2-2-1
+
+
+
+  child3
+number=-123.4e56789
+bigint=-1234567890n
+octal=-0o01234567
+hex=-0x0123456789abcdef
+regex
+  test=/regex/g
+  break=//
+  break2=//;alert();/g
+
+</textarea>-->
+
+<textarea id="input">
+g=item^5
+</textarea>
+<div id="line_numbers"></div>
+<div id="warnings"></div>
+<pre id="output"></pre>
+<div id="success_template">Build succeeded.</div>
+<body>
+<style>
+	body, body * {
+		margin:0;
+		font-family:monospace; font-size:20px; line-height:22px;
+	}
+	#input, #output { background:transparent; }
+	#input, #output, #line_numbers {
+		box-sizing:border-box;
+		position:absolute;
+		min-height:100vh;
+		padding:10px;
+		tab-size:1.2em;
+		white-space:pre;
+	}
+	#input {
+		min-height:100vh;
+		width:50vw; border-width:0; resize:none;
+		outline-width:0;
+	}
+	#line_numbers, #warnings {
+		min-height:100vh;
+		position:absolute;
+		user-select:none;
+	}
+	#line_numbers {
+		width:0px; box-sizing:border-box;
+		padding-left:0; padding-right:0;
+		background-color:#ddf2dd;
+		text-align:center;
+	}
+	#output { width:50vw; right:0;
+		margin:0; padding-left:0.5em; overflow:scroll; }
+
+	error { display:block; color:darkred; }
+	error::before { content:"🛑 "; }
+	
+	#success_template { color:green; }
+	#success_template::before { content:"🟢 "; font-size:16px; }
+	#success_template:not(#output #success_template) { display:none; }
+
+	warn {
+		position:absolute; margin-top:5px;
+		width:100%; display:block;
+	}
+	warn::after {
+		/* content:"⚠"; */
+		content:"⚠️";
+		position:relative; top:3px; left:1px; font-size:14px;
+	}
+	warn tooltip {
+		/* display:block; */
+		display:none; border-radius:3px;
+		font-family:monospace;
+		padding:0.25em 0.5em;
+		position:absolute; right:100%;
+		width:auto; max-width:40vw;
+		white-space:pre; overflow-x:auto;
+		background:#ffffc7ee; color:black;
+	}
+	warn:hover tooltip { display:block;	}
+
+	#line_bg { display:none; position:absolute; background:#f6f6f6; width:100%; }
+</style>
+
+<script src="perchance.js"></script>
+<script>
+	var char_height = 22, display_pad = 10;
+	
+	function err(msg, positions, source, compiled_so_far) {
+		update_lines();
+		output.innerHTML = compiled_so_far;
+		output.appendChild(document.createElement("error"))
+			.innerHTML = msg.replaceAll(/\.\s+/g, ".\n  ");
+		console.error(msg);
+		err.count++;
+	};
+	err.count = 0;
+	err.reset = function() { err.count = 0; }
+	
+	var warn = (function() {
+		function warn(msg, positions, source) {
+			positions.forEach(show_warning, msg);
+		};
+		warn.reset = function() {
+			warnings.innerHTML = "";
+			shown_warnings = {};
+		}
+	
+		var warning_template = document.createElement("warn");
+		var shown_warnings = {};
+		function show_warning(position) {
+			var warning = shown_warnings[position.line];
+			if (warning) {
+				warning.msg += "\n⚠ "+this; // msg
+			}
+			else {
+				warning = shown_warnings[position.line] =
+					warnings.appendChild(warning_template.cloneNode(true));
+				warning.style.top = (position.line * char_height) + "px"
+				warning.msg = "⚠ "+this; // msg;
+				warning.onmouseover = warn_hover;
+			}
+			proxy.innerHTML = new Array(position.line).fill("\n").join("");
+		}
+
+		function warn_hover() {
+			var tooltip = document.createElement("tooltip");
+			tooltip.innerHTML = this.msg
+				.trim()
+				.split("\n")
+				.map(function(w,i) {
+					w = w.replace(/\.\s+/gm, ".<br/>  ");
+					if (i>0) { return "<br/>" + w; }
+					else { return w ;}
+				})
+				.join("");
+			this.appendChild(tooltip);
+			this.onmouseover = undefined;
+		}
+		
+		return warn;		
+	})();
+
+	var p_config = { error:err, warn:warn, test_values:true };
+	var start_to_js, end_to_js, start_build, end_build;
+	function show_compiled() {
+		update_lines();
+
+		end_to_js = -1;
+		end_build = -1;
+		
+		console.group("Compiling");
+		try {
+			warn.reset();
+			//* process in worker to not block UI thread?
+			var compiled = "";
+			start_to_js = performance.now();
+			compiled = perchance.to_js(input.value, p_config);
+			end_to_js = performance.now();
+			
+			output.innerHTML = compiled;
+	
+			var error;
+			try {
+				start_build = performance.now();
+				window.root = perchance.build_js(compiled);
+				end_build = performance.now();
+			}
+			catch(e) { error = e; }
+			
+			if (error) {
+				output.appendChild(document.createElement("error"))
+					.innerText = "Build error: " + error.message;
+				update_line_numbers_height();
+				console.error(error);
+			}
+			else {
+				var success = output.appendChild(success_template.cloneNode(true));
+				success.style.top = (lines_in_source*char_height) + "px";
+				success.appendChild(new Text(`\n  Compiled in ${end_to_js-start_to_js}ms.\n  Built in ${end_build-start_build}ms.`))
+				update_line_numbers_height();
+			}
+		}
+		catch(e) {}
+
+		if (end_to_js === -1) { console.warn("Did not compile."); }
+		else { console.log("Compiled in "+(end_to_js-start_to_js)+"ms."); }
+		
+		if (end_build === -1) { console.warn("Did not build."); }
+		else { console.log("Built in "+(end_build-start_build)+"ms."); }
+
+		console.groupEnd("Compiling");
+	}
+
+	var lines_in_source = 0;
+	var update_lines = (function() {
+		var number_width = 0, line_number_strings = [];
+		var char_width = 16, line_pad = 16;
+		
+		return function update_lines() {
+			var lines = input.value.split("\n");
+			while (line_number_strings.length < lines.length) {
+				line_number_strings.push(
+					(line_number_strings.length + 1).toString());
+			}
+			
+			if (lines_in_source !== lines.length) {
+				var numbers_to_show = line_number_strings.slice(0, lines.length);
+				line_numbers.innerHTML = numbers_to_show.join("\n");
+				lines_in_source = lines.length;
+				
+				var new_number_width = numbers_to_show[numbers_to_show.length-1]
+					.length;
+				if (number_width !== new_number_width) {
+					var width = (new_number_width*char_width) + (line_pad*2);
+					var text_width = `calc(50vw - ${width/2}px)`;
+					
+					line_numbers.style.width =
+					warnings.style.width = width + "px";
+					line_numbers.style.left =
+					warnings.style.left = text_width;
+					
+					input.style.width =
+					output.style.width = text_width;
+				}
+			}
+		}
+	})();
+
+	function update_line_numbers_height() {
+		line_numbers.style.minHeight = Math.max(input.offsetHeight, output.offsetHeight) + "px";
+	}
+
+	function update() {
+		update_input_height();
+		show_compiled();
+	}
+	var debounce_timer, debounce_ms = 100;
+	input.oninput = function debounced_update() {
+		if (debounce_timer) { clearTimeout(debounce_timer); }
+		debounce_timer = setTimeout(update, debounce_ms);
+	};
+
+	function update_input_height() {
+		input.style.height = 0;
+		var height = Math.max(window.innerHeight, input.scrollHeight);
+		// console.log({ window:window.innerHeight, input:input.scrollHeight, height });
+		input.style.height = height + "px";
+	}
+
+	window.addEventListener("resize", function() {
+		update_input_height();
+		update_line_numbers_height();
+	})
+	
+	// start in different event so that errors do not stop this code
+	setTimeout(update,0);
+
+	// line highlight
+	var displayed_bottom;
+	window.addEventListener("mousemove", function(e) {
+		displayed_bottom = display_pad + (lines_in_source*char_height);
+		if (e.pageY > display_pad && e.pageY < displayed_bottom) {
+			line_bg.style.display = "block";
+			line_bg.style.top = (display_pad + Math.floor((e.pageY-display_pad)/char_height)*char_height) + "px";
+		}
+		else { line_bg.style.display = "none"; }
+	}, "capture");
+	
+	window.addEventListener("mouseout", function() {
+		line_bg.style.display = "none";
+	});
+</script>

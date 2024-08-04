@@ -1,0 +1,456 @@
+<!doctype html><body>
+<style>
+	body { font-size:140%; line-height:140%; margin:0; }
+
+	a { color:blue; }
+	a[bookmark] { text-decoration:none; }
+	a[bookmark]:hover { text-decoration:underline; }
+	
+	h1, h2, p, li { margin:20px auto; padding:0 10px; }
+	
+	h1, h2 { margin-top:2em; }
+	h1 { max-width:900px; border-bottom:3px double #ccc;
+		   font-size:180%; font-weight:bold; padding-bottom:0.5em;
+		   line-height:1.0;}
+	h2 { max-width:850px; border-bottom:1px solid #ccc;
+		   font-size:130%; font-weight:normal; padding-bottom:0.25em; }
+	
+	p { max-width:800px; }
+	ul { margin-left:0; }
+	li { max-width:750px; padding-left:0; }
+
+	.subtitle { font-style:italic; color:#6c6c6c; }
+	
+	p.note {
+		max-width:700px; padding:0.5em 0.5em 0.5em 0.75em;
+		background: #f7f7ff; border-left: 10px solid #b6b6ff;
+		border-radius:3px;
+	}
+	p.note::before { content:"NOTE: "; }
+
+	p.eg {
+		max-width:700px; padding:0.5em 0.5em 0.5em 0.75em;
+		background: #f7f7f7; border-left: 10px solid #d8d8d8;
+		border-radius:3px;
+	}
+	p.eg::before { content:"eg. "; font-style:italic; font-family:handwriting; }
+
+	q, a[q] {
+		font-family:monospace; font-size:110%;
+		border:1px solid #ccc; border-radius:3px;
+		background:#eee; padding:2px 4px;
+	}
+	q::before { content:""; }
+	q::after { content:""; }
+
+	@media (prefers-color-scheme:dark) {
+		body { background:#000; color:#ddd; }
+		h1, h2 { color:#fff; }
+		a {color: #8a8af5;}
+		q, a[q] { background:#222; border-color:#444; }
+
+		p.note { background:#363647; }
+		p.eg {background: #333;}
+	}
+</style>
+
+<p class="subtitle">Perchance Documentation</p>
+
+<h1 id="fns">Functions</h1>
+
+<p id="createPerchanceTree"><strong>createPerchanceTree(text)</strong>:
+	Returns a perchance tree generated using the text as the source code.
+</p>
+	
+<h1 id="node">Node properties & methods</h1>
+<p>Property names for each child node,
+	pointing to that node.</p>
+<p>Names of perchance properties can 
+	be used lists, but will not work.</p>
+
+<!-- Function properties use a getter to 
+generate a function every time they are called. -->
+<!-- Normal properties use a complex getter
+for strings. Simple getter. -->
+
+
+<p id="getSelf"><strong>getSelf</strong>: returns itself.</p>
+<!-- Why is this needed? -->
+
+
+<!-- Most values can be set or changed.
+	Most of the time this has no effect. -->
+<p id="allKeys"><strong>$allKeys</strong>: 
+	An array containing all options, 
+	function names, and property names 
+	in the order they were written 
+	in the source.</p>
+<p><em>getAllKeys</em>: a copy of <q>$allKeys</q>.</p>
+
+<p><em>$allKeysSet</em>:
+	A Set object of $allKeys.</p>
+
+<p id="children"><strong>$children</strong>:
+	An array of the child options by name.</p>
+<!-- Internally used. But changeable by creators. -->
+<!-- Can be added to, but breaks odds evaluation. -->
+<p><em>getLength</em>: returns how many items are in <q>$children</q>.</p>
+<p><em>getChildNames</em>: a copy of <q>$children</q>.</p>
+
+<p id="declarationLineNumber"><strong>$declarationLineNumber</strong>:
+	The line number in the source
+	that generated this node.</p>
+
+<p id="functionChildren"><strong>$functionChildren</strong>:
+	An array of child functions by name.</p>
+<p><em>getFunctionNames</em>: a copy of <q>$functionChildren</q>.</p>
+
+<p id="id"><strong>$id</strong>:
+	A number which corresponds to the order 
+	the nodes were generated.
+	An $id of 3 means the node was 
+	the third to be generated.</p>
+
+<p id="moduleName"><strong>$moduleName</strong>:
+	A string of the generator's id.</p>
+<!-- Is this used when importing? -->
+
+<p id="nodeType"><strong>$nodeType</strong>:
+	A string of the type of the node.</p>
+<ul>
+	<li><strong>normal</strong>:
+		A node. The only type.</li>
+</ul>
+<!-- Can be "value"? -->
+<!-- .$value? -->
+
+<p id="odds"><strong>$odds</strong>:
+	The number representing the weighting
+	given to this node when being chosen randomly.
+	Derived by evaluating <q>.$oddsText</q>.</p>
+<p>Cannot be set directly; 
+	set by changing <a q href="#oddsText">$oddsText</a>.</p>
+<p>After evaluation of the odds string,
+	a value of <q>true</q> produces a weighting of 1.
+	A value of <q>false</q> produces a weighting of 0.
+	A value of a number produces that number.</p>
+<!-- Or a string of "true"/"false"? -->
+<!-- Test strings that contain /[0-9\/*&|%!.\(\)e\-]/
+	Guessing a caught error will be thrown because of eval,
+	And will return `false`.
+	How is `false` handled? -->
+
+<!-- Pretty complex and memory-hungry, to be called so many times! -->
+<p><em>getOdds</em>: returns <q>$odds</q>.</p>
+
+
+<p id="oddsText"><em>$oddsText</em>:
+	The string of the odds to be used
+	in <q>$odds</q>.
+	Defaults to "1".
+<p>Can be set to set the node's odds.</p>
+
+<!-- Test writing to... -->
+<p id="parent"><strong>$parent</strong>:
+	The parent node of this node.</p>
+<p><em>getParent</em>: returns <q>$parent</q>.</p>
+	
+<p id="perchanceCode"><strong>$perchanceCode</strong>:
+	The source string that generated this node
+	and its children.</p>
+<p><em>getRawListText</em>: returns <q>$perchanceCode</q>.</p>
+
+<p id="root"><strong>$root</strong>:
+	A proxy to the root.
+	Can be used to refer to the root object.</p>
+<!-- Why is this a proxy? -->
+
+<p id="text"><strong>$text</strong>:
+	String of the node, without the odds.</p>
+<p><em>getName</em>: returns <q>$text</q>.</p>
+<!-- Hidden? -->
+
+<p id="valueChildren"><strong>$valueChildren</strong>:
+	Names of "property" child nodes.</p>
+<!-- in the order they were in the source? -->
+<p><em>getPropertyKeys, getPropertyNames</em>: a copy of <q>$valueChildren</q>.</p>
+
+
+<!-- Cannot be set, has getter... -->
+<p id="consumableList"><strong>consumableList</strong>:
+	Returns a unique item from the list
+	each time it is evaluated.
+	When all items have been returned,
+	returns <q>(no more items in the consumable '[name of the original list]' list)</q>
+	instead.</p>
+
+<!-- Something about $output being handled.
+	Perhaps ignored by proxy? -->
+<!-- Some properties are proxied. -->
+<!-- Methods use originalmethod.bind(proxy)(), which creates a new function every time. -->
+<!-- alreadyConsumedItems added to, but not used? -->
+<!-- Consume proccessed in evaluateItem, for {o1|o2} values -->
+<!-- https://perchance.org/consumable-list-example-1 -->
+
+<!-- __addNodeMethods(node) is run on *every node*,
+	creating unique functions and property definitions
+	for each
+-->
+
+<p id="createClone"><strong>createClone()</strong>:
+	Returns new node and children, 
+	disconnected from the tree.</p>
+<!-- Regenerates the entire node tree from $perchanceCode -->
+<!-- Ignores any changes made at runtime by scripts. (unless $perchanceCode changes?) -->
+
+<!-- Clone is the cloned node's .getSelf? -->
+
+<!-- Hidden $allNodes? All nodes and child nodes. -->
+<!-- Node copies added to original root's $allNodes -->
+<!-- Node copies have updated $id -->
+
+<!-- Node copies have root of the original root,
+and moduleName of the original moduleName -->
+<!-- declarationLineNumber not currently updated -->
+
+<p id="evaluateItem"><strong>evaluateItem</strong>:
+	The same as <q>.valueOf()</q>.</p>
+<!-- uses __valueOfMethod -->
+<!-- automatically converted to a number if able,
+	in a memory-intensive way. -->
+
+<p id="toString"><strong>toString()</strong>:
+	Returns evaluated string of the node.</p>
+<!-- toString({ keepEscapes:true }):
+	Returns evaluated string but leaves <q>\</q> in escape sequences. -->
+
+<!-- Processes stuff into final string -->
+<!-- Quite complex, for it to be used everywhere -->
+
+<!-- __evaluateText is generating objects for declarationLineNumber and moduleName -->
+<!-- It's used *for everything* so this is pretty much a memory leak. -->
+<!-- For lists of options, uses .selectOne and evaluates that. -->
+<!-- Passes a lot of stuff from the original node. 
+	Could just pass the original node. 
+	Perhaps to an alternative method? -->
+<!-- leftBlocks and rightBlocks are creating new arrays *every iteration* -->
+
+
+<h2>List Manipulations</h2>
+<p id="selectAll"><strong>selectAll</strong>:
+	Returns an array of all contained items.
+	When used on a value that is just an inline option set,
+	returns an array of those options.</p>
+<p class="note">This includes items with 0 <a q href="#odds">odds</a>
+	of being generated from the list.</p>
+
+<p id="selectMany"><strong>selectMany(count), selectMany(minCount, maxcount), selectMany([count1, count2, ...])</strong>:
+	Returns an array containing the indicated number 
+	of randomly-selected items from the list.</p>
+<p class="note">Duplicates can be selected.
+	Simply rendering this to the page
+	will join all items together into one string.</p>
+<!-- Uses .selectOne -->
+
+<p id="selectOne"><strong>selectOne</strong>:
+	Returns one node at random from the list.
+	If no nodes are possible, 
+	returns <q>"(no more items in the consumable '[list name]' list)"</q>.
+</p>
+<p>When used on a value node, returns the evaluated node.</p>
+<!-- Always creates a Set: let consumedNodes = new Set(); -->
+<!-- Could use the same EMPTYSET object every time to save memory,
+	as it's never changed, only checked.
+	Or skip checks when there is no set to check. -->
+<!-- isConsumableList not really used. Can simplify. -->
+<!-- Adds all possible items and odds to an array, using memory.
+	Possibly unavoidable. Could use same array? -->
+
+<p id="selectUnique"><strong>selectUnique(count), selectUnique(minCount, maxcount), selectUnique([count1, count2, ...])</strong>:
+	Does the same as <a q href="#selectMany">selectMany</a>
+	without duplicates.</p>
+<!-- uses .consumableList.selectMany() -->
+
+<p id="sumItems"><strong>sumItems</strong>:
+	All child options added together in order.</p>
+<p class="note">Starts with the number 0.
+	Then while each value is a number, 
+	they are added together mathmatically.
+	From when a non-number (string) value is added
+	onward, items are added on as strings&mdash;similar
+	to <a q href="#joinItems">.joinItems("")</a></p>
+<!-- Likely not what the user wanted, if any non-numbers are involved. -->
+
+<p id="titleCase"><strong>titleCase</strong>:
+	Makes the first letter of each word uppercase, 
+	and the rest lowercase.</p>
+<!-- Doesn't capitalise directly after any non-space non-letter -->
+<p class="note">This includes small words like "a", "the", or "of".</p>
+
+
+
+
+<h2>String Transform Properties</h2>
+<p class="note">These will not work on normal strings, only nodes.</em></p>
+
+<p id="tense"><strong>pastTense, presentTense, futureTense</strong>:
+	The string but in a specific tense.</p>
+<!-- Uses __nlpCompromise -->
+<!-- Runs this.toString() multiple times, which could be costly -->
+
+<p id="lowerUpperCase"><strong>lowerCase, upperCase</strong>:
+	The string converted to lower or upper case.</p>
+
+<p id="negativeForm"><strong>negativeForm</strong>:
+	The string with verbs turned into their opposites.</p>
+<p class="eg">"I went to the shops" becomes "I did not go to the shops."</p>
+
+<p id="singlePluralForm"><strong>singularForm, pluralForm</strong>:
+	The string with nouns turned into plurals or singular nouns.</p>
+<p class="eg">"I went to the shop" pluralised becomes "They went to the shops"</p>
+<p class="eg">"They went to the shops" singularised becomes "I went to the shop"</p>
+<!-- pluralForm broken? -->
+
+<p id="sentenceCase"><strong>sentenceCase</strong>:
+	The string with the first letter of each sentence uppercase.</p>
+
+<p id="toLocaleString"><strong>toLocaleString()</strong>:
+	Returns the locale string for things like dates and numbers.
+	If the node evaluates to a string of a number,
+	returns the locale string for that number.</p>
+
+
+
+<h2>String Manipulation</h2>
+<p id="joinItems"><strong>joinItems(between)</strong>:
+	Returns a string with each <q>$children</q> item's <q>getName</q>,
+	and <q>between</q> inserted in between each as a string.
+	If <q>between</q> unspecified, joins with an empty string.</p>
+<p>Returns <q>$output</q> instead, if available.</p>
+<!-- Breaks if $output is a function? -->
+
+<p id="replaceText"><strong>replaceText(find, replace)</strong>:
+	Returns a string with all instances of <q>find</q> 
+	replaced with <q>replace</q>.</p>
+<p><q>find</q> may be a regular expression (<q>RegExp</q>) object,
+	which would be used for the replace.
+	(See <a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String/replace#pattern" 
+			 target="_blank">MDN</a>.)
+</p>
+<!-- For a string `find`, splits and joins 
+	which is less efficient and more memory intensive than replaceAll. -->
+
+
+
+
+
+
+
+	
+
+<h1 id="array">Array special properties and methods</h1>
+
+<p>See 
+	<a q href="#selectOne">selectOne</a>,
+	<a q href="#selectMany">selectMany</a>,
+	<a q href="#selectUnique">selectUnique</a>,
+	<a q href="#joinItems">joinItems</a>,
+	and <a q href="#sumItems">sumItems</a>.</p>
+
+<p id="arr_getSelf"><strong>getSelf</strong>: The array.</p>
+<p><em>selectAll</em>: The array.</p>
+
+<p id="arr_getLength"><strong>getLength</strong>: The number of items in the array.</p>
+
+<p id="arr_getOdds"><strong>getOdds</strong>: Always <q>1</q>.</p>
+
+<p id="arr_consumableList"><strong>consumableList</strong>: Returns a <a q href="#consumableList">consumableList</a>.</p>
+
+<p id="arr_toString"><strong>toString()</strong>:
+	Returns <a q href="#selectOne">selectOne</a></p>
+
+
+<h2>String Manipulation and Text Transform methods</h2>
+<p>A copy of the array is returned,
+	with all items manipulated or transformed.
+	See <a q href="#singlePluralForm">singularForm, pluralForm</a>,
+	<a q href="#tense">pastTense, presentTense, futureTense</a>,
+	<a q href="#titleCase">titleCase</a>, <a q href="#lowerUpperCase">upperCase, lowerCase</a>, <a q href="#sentenceCase">sentenceCase</a>,
+	<a q href="#replaceText">replaceText</a>.
+</p>
+
+
+
+<h1 id="string">String special properties and methods</h1>
+<p>See <a q href="#titleCase">titleCase</a>,
+	<a q href="#sentenceCase">sentenceCase</a>,
+	<a q href="#upperLowerCase">upperCase, lowerCase</a>,
+	<a q href="#replaceText">replaceText</a>,
+	<a q href="#tense">pastTense, presentTense, futureTense</a>,
+	and <a q href="#singularPluralForm">singularForm, pluralForm</a>.
+</p>
+
+<p id="str_getSelf"><strong>getSelf</strong>:
+	Returns a new string with the same contents.</p>
+<p><em>getName</em>:
+	Returns <a q href="#str_getSelf">getSelf</a>.</p>
+	
+<p><strong>getOdds</strong>:
+	Returns <q>1</q>.</p>
+
+<p id="str_evaluateItem"><strong>evaluateItem</strong>:
+	Returns a string of the processed text.
+	If that string would be of a number, returns that number instead.</p>
+<p><em>selectOne</em>:
+	Returns <a q href="#str_evaluateItem">evaluateItem</a>.</p>
+	<!-- ? -->
+
+<p><strong>selectMany(count)</strong>:
+	Returns an array with <q>count</q> items,
+	each taken from <a q href="#str_evaluateItem">selectOne</a>.</p>
+
+
+	
+
+<h1 id="other">Number, Boolean special properties and methods</h1>
+<p>The properties <q>titleCase</q>,
+	<q>sentenceCase</q>,
+	<q>upperCase</q>, <q>lowerCase</q>,
+	<q>pastTense</q>, <q>presentTense</q>, <q>futureTense</q>,
+	<q>getSelf</q>, <q>getName</q>, <q>evaluateItem</q>,
+	<q>selectOne</q>, <q>singularForm</q>, and <q>pluralForm</q>
+	return the original value's <q>valueOf()</q>.
+</p>
+
+<p><strong>selectMany(count)</strong>:
+	Returns an array with <q>count</q> items
+	of the original value's <q>valueOf()</q>.</p>
+
+<p id="other_getOdds"><strong>getOdds</strong>:
+	Returns <q>1</q>.</p>
+
+
+	
+<script>
+/*
+for (var anchor of document.querySelectorAll("a[href^='#']")) {
+	var href = anchor.getAttribute("href");
+	if (!document.getElementById(href.substr(1))) {
+		console.warn(`Cannot find target element for anchor ${href}.`);
+	}
+}
+//*/
+var bookmark_template = document.createDocumentFragment();
+(function() {
+	var a = bookmark_template.appendChild(document.createElement("a"));
+	a.innerText = "#";
+	a.setAttribute("bookmark", "");
+	bookmark_template.appendChild(new Text(" "));
+})();
+
+for (var elem of document.querySelectorAll("[id]")) {
+	elem.insertBefore(bookmark_template.cloneNode(true), elem.firstChild);
+	elem.firstChild.href = "#" + elem.id;
+}
+</script>
+</body>
